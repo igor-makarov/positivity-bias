@@ -23,7 +23,9 @@ const mfOptions = convertV4MiniflareOptions({
   log: new Log(LogLevel.DEBUG),
   name: 'positivity-bias', scriptPath: 'dist/worker.js', modules: true, compatibilityDate: '2026-10-13',
   durableObjects: { NEWS: { className: 'NewsStore', useSQLite: true } },
-  assets: { directory: 'public', binding: 'ASSETS', run_worker_first: ['/api/*'] },
+  // Wrangler marks the Worker as the user worker; the raw Miniflare v4 options
+  // must set has_user_worker explicitly or the assets router cannot dispatch /api/*.
+  assets: { directory: 'public', binding: 'ASSETS', run_worker_first: ['/api/*'], routerConfig: { has_user_worker: true } },
   bindings: { REWRITES_PER_REFRESH: '8' },
   outboundService: fixtureFetch
 });
