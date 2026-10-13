@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "id": "1-1",
+    "outcome": "running",
+    "runId": "38403235636",
+    "minEntryId": 7,
+    "maxEntryId": 7,
+    "checkpointAt": "2026-10-13T13:13:50.602Z",
+    "transcript": "checkpoint"
+  }
+]
