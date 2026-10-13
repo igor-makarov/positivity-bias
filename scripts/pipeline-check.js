@@ -60,6 +60,22 @@ try {
   const usage = await (await store.fetch(`https://news.internal/usage?day=${day}`)).json();
   assert.ok(usage.used > 0 && usage.used <= 6000, `unexpected usage ${usage.used}`);
 
+  // The configured default (no REWRITE_MODEL env) is the available low-cost Qwen3, and
+  // its chat-shaped `choices[].message.content` response (with a thinking channel) is
+  // accepted end-to-end and verified by clef. This locks in the default-model switch.
+  const defaultStore = namespace.get(namespace.idFromName('default-model'));
+  const defaultSeed = { articles: [], updatedAt: null, lastAttemptAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+    policyFingerprint: null, rewriteStatus: 'not_configured', sources: [] };
+  const defaultRun = await (await defaultStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: defaultSeed,
+    env: { VALIDATOR_MODEL: '@cf/cloudflare/clef-flash', DAILY_NEURON_BUDGET: '6000', CONTEXT_CHARS: '6000', MAX_CONTEXT_FETCHES: '4' } }) })).json();
+  assert.equal(defaultRun.result.rewriteStatus, 'ok');
+  assert.equal(defaultRun.calls.rewrite, 1);
+  assert.deepEqual(defaultRun.calls.models, ['@cf/qwen/qwen3-30b-a3b-fp8']); // the code default, not the removed Llama slug
+  const defaultSnapshot = await (await defaultStore.fetch('https://news.internal/snapshot')).json();
+  const defaultAccepted = defaultSnapshot.articles.find((article) => article.originalHeadline === 'לפי המועצה: 3 תוכניות אושרו');
+  assert.equal(defaultAccepted.rewriteStatus, 'rewritten');
+  assert.equal(defaultAccepted.headline, 'לפי המועצה אושרו 3 תוכניות');
+
   // Cached decisions: a second refresh re-infers neither the accepted nor the rejected article.
   const cachedSeed = await (await store.fetch('https://news.internal/snapshot')).json();
   cachedSeed.lastAttemptAt = new Date(Date.now() - 2 * 3_600_000).toISOString();

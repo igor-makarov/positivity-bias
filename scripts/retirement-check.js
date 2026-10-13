@@ -6,7 +6,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { DEFAULT_REWRITE_MODEL, policyFingerprint, sourceFingerprint } from '../src/policy.js';
+import { LLAMA_REWRITE_MODEL, policyFingerprint, sourceFingerprint } from '../src/policy.js';
 
 const directory = await mkdtemp(join(process.cwd(), '.probe-'));
 const outfile = join(directory, 'probe.js');
@@ -26,7 +26,7 @@ try {
   // Mirror the real pre-correction (bootstrap) snapshot: the old pipeline stored
   // `<model>:editorial-v2` on each rewrite and no snapshot-level policy fingerprint.
   // The correction must retire exactly that state on first serve, without inference.
-  const legacyFingerprint = `${DEFAULT_REWRITE_MODEL}:editorial-v2`;
+  const legacyFingerprint = `${LLAMA_REWRITE_MODEL}:editorial-v2`;
   const article = { id: 'drone-1', url: 'https://www.ynet.co.il/news/article/1', sourceId: 'ynet', sourceName: 'ynet',
     originalHeadline: 'התעשייה האווירית השלימה בהצלחה ניסוי במל״ט שמצויד במקלע',
     headline: 'תעשייה אווירית: ניסוי במל״ט עם מקלע נכשל', rewriteStatus: 'rewritten',

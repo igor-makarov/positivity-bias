@@ -7,6 +7,37 @@
 - Sessions/control are on `shurik-control/main`; iterations continue immediately
   (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
+## Verified (2026-10-13, iteration 2-16)
+
+33. **Default rewrite model switched to the available low-cost Qwen3.** Cloudflare's
+    catalog no longer lists `@cf/meta/llama-3.1-8b-instruct-fp8-fast` (its docs page now
+    redirects to `/workers-ai/models/?unavailable=llama-3.1-8b-instruct-fp8-fast`), so
+    the configured default could not rewrite anything in production. Per the steering
+    ("switch after the concrete regression/factual checks pass" — they pass),
+    `DEFAULT_REWRITE_MODEL` and `wrangler.jsonc`'s `REWRITE_MODEL` are now
+    `@cf/qwen/qwen3-30b-a3b-fp8`. The old Llama slug is kept as `LLAMA_REWRITE_MODEL` in
+    the cheap allowlist and the planning window/rate tables, so it remains a valid
+    explicit override. Qwen3's chat envelope and thinking-off option were already
+    handled. The model is part of the policy fingerprint, so rewrites produced under the
+    old model are retired at read time and reprocessed progressively under the same
+    daily budget. Verified end-to-end under workerd with no `REWRITE_MODEL` env: the real
+    Worker chose `@cf/qwen/qwen3-30b-a3b-fp8`, accepted its
+    `choices[].message.content` response (with `reasoning_content` present) and verified
+    it with `@cf/cloudflare/clef-flash`. **Live Hebrew-quality and neuron-use measurement
+    against the account is still pending**; a candidate the guard or clef cannot
+    confidently accept keeps the preserved original. `npm run test:pipeline` now also
+    runs a refresh with no `REWRITE_MODEL` env and asserts the Worker called
+    `@cf/qwen/qwen3-30b-a3b-fp8` and accepted its chat-shaped response.
+34. **Live validation re-run (real feeds, no AI binding).** A real workerd refresh
+    ingested all four sources `ok`: ynet 115, kan 8, n12 74, mako 61, with publisher
+    categories preserved (12 distinct labels). A fresh live extraction sample: ynet
+    12/12 `complete` (854–5,832 chars); kan 8/8 `complete` (1,758–3,361), including the
+    exact reported drone-test article (defense/1108988, 1,680 chars, "הניסוי, שנערך
+    בהצלחה"); mako/N12 mostly `missing` because the publisher served a Radware
+    `validate.perfdrive.com` challenge (correctly refused as `unapproved_redirect` — the
+    pipeline does not follow bot challenges). Context completeness stays transient and is
+    never persisted or exposed.
+
 ## Verified (2026-10-13, iteration 2-15)
 
 32. **Live Kan article bodies were silently dropped by an over-broad noise wrapper.**
@@ -363,16 +394,16 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Latest full validation (iteration 2-15): `npm run check`, **62 unit tests**,
-`npm run build`, `npm run test:worker`, `npm run test:extract` (now also proves a
-noise-named layout wrapper does not suppress `<main>`), `npm run test:retirement`,
+Latest full validation (iteration 2-16): `npm run check`, **63 unit tests**,
+`npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
 `npm run test:pipeline`, `npm run test:batch`, `npm run test:browser` and
-`npm run test:interaction` all pass. The layout-wrapper extraction regression was shown
-to fail against the pre-fix extractor (`missing`) and pass after it; live Kan/ynet/mako
-pages were re-measured and only Kan changed (42-char shell → complete body). Prior
+`npm run test:interaction` all pass, plus an end-to-end workerd run proving the new
+default `@cf/qwen/qwen3-30b-a3b-fp8` is selected without `REWRITE_MODEL` and its
+chat-shaped response is accepted and clef-verified (also asserted in
+`npm run test:pipeline`). Prior iteration 2-15 covered the
+noise-named layout-wrapper extraction regression (shown to fail pre-fix, pass after);
 iteration 2-14 added the current-fingerprint generated-headline rejection serve-time
-regression and the clef-decision-invariant unit/pipeline regressions, each shown to
-fail against the pre-fix code and pass after it.
+regression and the clef-decision-invariant unit/pipeline regressions.
 
 Live re-check (iteration 2-15): a 20-article live sample across ynet (news/sport/
 /economy), mako (culture) and Kan (politic/global/local) measured: ynet 12/12 `complete`
@@ -389,33 +420,23 @@ remain missing by policy.
    deployed URL could not be inspected. Reconcile `wrangler.jsonc`
    (`positivity-bias`) with the connected Workers Builds Worker once access is
    available. Do not create a parallel deployment.
-2. **Live inference unverified.** Workers AI Hebrew quality, the `AI` binding and real
-   neuron use remain unmeasured. Mocks/fixtures prove wiring and fallbacks only. Switch
-   the default to Qwen3 only after measured live checks. Do not interpret a passing
-   fixture as successful production inference. Real-article extraction was re-exercised
-   against live pages in iterations 2-9/2-15; mako/N12 serve extractable pages and Kan
-   now extracts a complete body after the 2-15 layout-wrapper fix (see above).
-   Iteration 2-14 found the default rewrite model's docs page gone: requesting
-   `.../workers-ai/models/llama-3.1-8b-instruct-fp8-fast/` now redirects to
-   `/workers-ai/models/?unavailable=llama-3.1-8b-instruct-fp8-fast` ("deprecated,
-   removed, or not found") and the slug is absent from the 70-model catalog, though the
-   pricing page (Oct 9, 2026) still lists it. The catalog still lists
-   `@cf/qwen/qwen3-30b-a3b-fp8` and the cheap `llama-3.1-8b-instruct-fp8` /
-   `llama-3.2-*` models. This needs a live account to confirm whether the configured
-   default still serves inference; the pipeline safely preserves originals if it does
-   not. Do not switch the default on docs evidence alone.
-   Iteration 2-9 fixed the clef-flash integration: the verifier now uses the documented
-   decision schema (`state` + typed `noul` questions → `answers[*].noul`) instead of a
-   chat envelope, and the 24,576-token window / input-only pricing are used. A live
-   account is still needed to measure the *quality* of clef's yes/no probabilities and
-   real neuron use; the request/response contract now matches the published schema.
-   Evidence for the Qwen3 switch (iteration 2-6, docs/schema check): Cloudflare's
-   Qwen3 page documents `response_format` and exposes `choices.message.reasoning_content`,
-   and workerd's bundled AI types declare `chat_template_kwargs` for gpt-oss but not for
-   Qwen3, so thinking-off currently relies on the Qwen `/no_think` soft switch plus a
-   best-effort `chat_template_kwargs`. A live call must confirm which option the account
-   honors before the default is switched; both parser paths (chat `choices` and text
-   `response`) are already covered.
+2. **Live inference unverified.** Workers AI Hebrew quality and real neuron use remain
+   unmeasured. The default is now `@cf/qwen/qwen3-30b-a3b-fp8` (see 2-16); the switch is
+   wired and safe (any failure keeps the preserved original), but a live account is still
+   needed to measure Hebrew fidelity and confirm neuron consumption. Mocks/fixtures prove
+   wiring and fallbacks only; do not interpret a passing fixture as successful production
+   inference. `@cf/meta/llama-3.1-8b-instruct-fp8-fast` is no longer in the catalog and is
+   kept only as an explicit override (`LLAMA_REWRITE_MODEL`).
+   The previous default's docs page is gone: requesting
+   `.../workers-ai/models/llama-3.1-8b-instruct-fp8-fast/` redirects to
+   `/workers-ai/models/?unavailable=llama-3.1-8b-instruct-fp8-fast` and the slug is
+   absent from the catalog, though the pricing page (Oct 9, 2026) still lists it. The
+   catalog still lists `@cf/qwen/qwen3-30b-a3b-fp8`, which is now the default; a live
+   call must still confirm the account honors the thinking-off option and reports usage.
+   The verifier uses the documented clef schema (`state` + typed `noul` questions →
+   `answers[*].noul`) with the 24,576-token window / input-only pricing; a live account is
+   still needed to measure the *quality* of clef's yes/no probabilities and real neuron
+   use. Both parser paths (chat `choices` and text `response`) are covered.
 3. **Interactive QA.** Keyboard traversal, filter/order/pagination interaction and
    the rendered error/retry state are now covered by `npm run test:interaction`
    (see iteration 2-5). Render checks at 390×844 and 1440×1000 passed previously.

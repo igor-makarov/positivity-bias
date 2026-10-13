@@ -6,7 +6,7 @@ import worker, { NewsStore } from '../src/worker.js';
 const validatorDefault = '@cf/cloudflare/clef-flash';
 
 function createMockAI(validatorModel, rewriteMode, validatorMode) {
-  const calls = { rewrite: 0, verify: 0 };
+  const calls = { rewrite: 0, verify: 0, models: [] };
   const run = async (model, input) => {
     if (model === validatorModel) {
       calls.verify++;
@@ -22,19 +22,26 @@ function createMockAI(validatorModel, rewriteMode, validatorMode) {
       return { model: 'clef-flash', answers, usage: { input_tokens: 1000, output_tokens: 0 } };
     }
     calls.rewrite++;
+    calls.models.push(model);
+    // Return the documented envelope for the configured model: Qwen3 answers under
+    // `choices[].message.content` (with a thinking channel), the older Llama shape under
+    // `response`. This keeps the default-model path honest instead of assuming one shape.
+    const envelope = (content) => /qwen3/i.test(model)
+      ? { choices: [{ message: { content, reasoning_content: 'חשיבה' } }], usage: { prompt_tokens: 1200, completion_tokens: 120 } }
+      : { response: content };
     // A model that returns unparseable output must be surfaced, not reported as ok.
-    if (rewriteMode === 'invalid') return { response: 'not json' };
+    if (rewriteMode === 'invalid') return envelope('not json');
     // Parseable JSON that answers none of the requested articles is also a failure.
-    if (rewriteMode === 'empty') return { response: JSON.stringify({ items: [] }) };
+    if (rewriteMode === 'empty') return envelope(JSON.stringify({ items: [] }));
     const items = JSON.parse(input.messages[1].content);
     // Simulate a model that silently drops an article: only the `/1` article is ever
     // answered, so `/2` is a model omission, not a rejection decision.
     if (rewriteMode === 'partial') {
       const answered = items.filter((item) => /\/1$/.test(item.id));
-      return { response: JSON.stringify({ items: answered.map((item) => ({ id: item.id, usable: true, headline: 'לפי המועצה אושרו 3 תוכניות' })) }) };
+      return envelope(JSON.stringify({ items: answered.map((item) => ({ id: item.id, usable: true, headline: 'לפי המועצה אושרו 3 תוכניות' })) }));
     }
-    return { response: JSON.stringify({ items: items.map((item) => ({ id: item.id, usable: true,
-      headline: /\/2$/.test(item.id) ? 'ראשי ערים קראו לשינוי דמוגרפי בישראל' : 'לפי המועצה אושרו 3 תוכניות' })) }) };
+    return envelope(JSON.stringify({ items: items.map((item) => ({ id: item.id, usable: true,
+      headline: /\/2$/.test(item.id) ? 'ראשי ערים קראו לשינוי דמוגרפי בישראל' : 'לפי המועצה אושרו 3 תוכניות' })) }));
   };
   return { calls, run };
 }

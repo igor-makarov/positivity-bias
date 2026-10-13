@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CONTEXT_POLICY, EDITORIAL_VERSION, DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, VALIDATOR_VERSION, needsRewrite, policyFingerprint, retireStaleRewrites, sourceFingerprint } from '../src/policy.js';
+import { CHEAP_MODELS, CONTEXT_POLICY, EDITORIAL_VERSION, DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, LLAMA_REWRITE_MODEL, MODEL_CONTEXT_TOKENS, MODEL_NEURON_RATES, VALIDATOR_VERSION, needsRewrite, policyFingerprint, retireStaleRewrites, sourceFingerprint } from '../src/policy.js';
 
 const fingerprint = policyFingerprint({});
 const stale = { id: 'drone-1', url: 'https://www.ynet.co.il/news/article/1', sourceId: 'ynet', sourceName: 'ynet',
@@ -13,7 +13,19 @@ test('The policy fingerprint covers the model, grounding policy, editorial and v
   assert.ok(fingerprint.includes(DEFAULT_REWRITE_MODEL));
   assert.ok(fingerprint.includes(DEFAULT_VALIDATOR_MODEL));
   assert.ok(fingerprint.includes(EDITORIAL_VERSION) && fingerprint.includes(CONTEXT_POLICY) && fingerprint.includes(VALIDATOR_VERSION));
-  assert.notEqual(policyFingerprint({ REWRITE_MODEL: '@cf/qwen/qwen3-30b-a3b-fp8' }), fingerprint);
+  assert.notEqual(policyFingerprint({ REWRITE_MODEL: LLAMA_REWRITE_MODEL }), fingerprint);
+});
+
+test('The default rewrite model is the available low-cost Qwen3 and the removed Llama slug stays overridable', () => {
+  assert.equal(DEFAULT_REWRITE_MODEL, '@cf/qwen/qwen3-30b-a3b-fp8');
+  assert.ok(CHEAP_MODELS.has(DEFAULT_REWRITE_MODEL));
+  // The previous default is no longer in Cloudflare's catalog; it must not be the
+  // default but must remain a valid explicit override with planning window/rate.
+  assert.notEqual(DEFAULT_REWRITE_MODEL, LLAMA_REWRITE_MODEL);
+  assert.ok(CHEAP_MODELS.has(LLAMA_REWRITE_MODEL));
+  assert.ok(MODEL_CONTEXT_TOKENS[LLAMA_REWRITE_MODEL] > 0);
+  assert.ok(MODEL_NEURON_RATES[LLAMA_REWRITE_MODEL].in > 0);
+  assert.equal(MODEL_CONTEXT_TOKENS[DEFAULT_REWRITE_MODEL], 32_768);
 });
 
 test('A wrong cached headline is retired at serve time when the pipeline version changes', () => {

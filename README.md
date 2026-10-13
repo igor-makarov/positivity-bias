@@ -67,12 +67,13 @@ Cloudflare authentication outside the connected Builds runner.
 
 Rewrites use **Cloudflare Workers AI**, with the native `AI` binding declared in
 `wrangler.jsonc`. No inference API key is needed. The Actions OCGO key is only
-for Shurik. The inexpensive default is `@cf/meta/llama-3.1-8b-instruct-fp8-fast`.
-The cheap allowlist also permits `@cf/qwen/qwen3-30b-a3b-fp8` (documented Hebrew
-support, lower output price) and Llama 3.2 1B/3B. Expensive or paid-only models
-are blocked. Qwen3's thinking phase is disabled and its chat-style response
-envelope is handled; switching the default still requires measured Hebrew-quality
-checks against the live account.
+for Shurik. The inexpensive default is `@cf/qwen/qwen3-30b-a3b-fp8`
+(Hebrew support documented, 32,768-token window, lower output price); the previous
+default `@cf/meta/llama-3.1-8b-instruct-fp8-fast` is no longer listed in Cloudflare's
+model catalog and is retained only as an overridable allowlist entry. The cheap
+allowlist also permits Llama 3.2 1B/3B. Expensive or paid-only models are blocked.
+Qwen3's thinking phase is disabled and its chat-style response envelope is handled;
+live Hebrew-quality and neuron-use measurement against the account is still pending.
 
 Each refresh fetches the **full accessible article text** for the candidates it can
 afford, strips navigation, advertising and unrelated recommendations, and passes the

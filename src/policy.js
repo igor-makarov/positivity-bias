@@ -16,13 +16,29 @@ export const CONTEXT_POLICY = 'full-text-v3';
 // maximally uncertain 0.5 verdict).
 export const VALIDATOR_VERSION = 'clef-guard-v3';
 
-export const DEFAULT_REWRITE_MODEL = '@cf/meta/llama-3.1-8b-instruct-fp8-fast';
+// First-choice low-cost rewrite model. `@cf/qwen/qwen3-30b-a3b-fp8` documents Hebrew
+// support, has a 32,768-token window and is cheaper on output tokens than the previous
+// default. The concrete regression/factual checks (success-to-failure reversal, the
+// Karmiel/Dimona material-context case, cross-article independence, the confident-yes
+// guard) pass with it, and its chat-style response envelope plus thinking-off option are
+// handled. Live Hebrew-quality and neuron-use measurement against the account is still
+// pending, so a candidate that the guard or clef cannot confidently accept keeps the
+// preserved original.
+//
+// The previous default `@cf/meta/llama-3.1-8b-instruct-fp8-fast` is no longer listed in
+// Cloudflare's model catalog (its docs page redirects to `?unavailable=`), so it is kept
+// only as an explicitly overridable allowlist entry and planning rate, never as the
+// default. Switching the default changes the policy fingerprint, so rewrites produced
+// under the old model are retired at read time and reprocessed progressively under the
+// same daily free-tier budget.
+export const DEFAULT_REWRITE_MODEL = '@cf/qwen/qwen3-30b-a3b-fp8';
+export const LLAMA_REWRITE_MODEL = '@cf/meta/llama-3.1-8b-instruct-fp8-fast';
 export const DEFAULT_VALIDATOR_MODEL = '@cf/cloudflare/clef-flash';
 
 // Cheap models only. No paid-only or expensive fallback is permitted.
 export const CHEAP_MODELS = new Set([
   DEFAULT_REWRITE_MODEL,
-  '@cf/qwen/qwen3-30b-a3b-fp8',
+  LLAMA_REWRITE_MODEL,
   '@cf/meta/llama-3.2-1b-instruct',
   '@cf/meta/llama-3.2-3b-instruct',
 ]);
@@ -32,8 +48,8 @@ export const CHEAP_MODELS = new Set([
 // Cloudflare model pages (2026-10-13): clef-flash 24,576, clef 65,536,
 // llama-3.2-1b 60,000, llama-3.2-3b 80,000, qwen3-30b-a3b 32,768.
 export const MODEL_CONTEXT_TOKENS = {
-  [DEFAULT_REWRITE_MODEL]: 128_000,
-  '@cf/qwen/qwen3-30b-a3b-fp8': 32_768,
+  [LLAMA_REWRITE_MODEL]: 128_000,
+  [DEFAULT_REWRITE_MODEL]: 32_768,
   '@cf/meta/llama-3.2-1b-instruct': 60_000,
   '@cf/meta/llama-3.2-3b-instruct': 80_000,
   // clef-flash is a decision model with a documented 24,576-token window; the larger,
@@ -47,8 +63,8 @@ export const MODEL_CONTEXT_TOKENS = {
 // tokens" (2026-10-13), which is the unit the Free account is billed in. These are
 // planning estimates only; the ledger is reconciled with provider-reported usage.
 export const MODEL_NEURON_RATES = {
-  [DEFAULT_REWRITE_MODEL]: { in: 4119 / 1_000_000, out: 34868 / 1_000_000 },
-  '@cf/qwen/qwen3-30b-a3b-fp8': { in: 4625 / 1_000_000, out: 30475 / 1_000_000 },
+  [LLAMA_REWRITE_MODEL]: { in: 4119 / 1_000_000, out: 34868 / 1_000_000 },
+  [DEFAULT_REWRITE_MODEL]: { in: 4625 / 1_000_000, out: 30475 / 1_000_000 },
   '@cf/meta/llama-3.2-1b-instruct': { in: 2457 / 1_000_000, out: 18252 / 1_000_000 },
   '@cf/meta/llama-3.2-3b-instruct': { in: 4625 / 1_000_000, out: 30475 / 1_000_000 },
   // 3,455 neurons per M input tokens and no output-token charge.

@@ -15,7 +15,7 @@
   "triggers": { "crons": ["7 * * * *"] },
   "ai": { "binding": "AI" },
   "vars": {
-    "REWRITE_MODEL": "@cf/meta/llama-3.1-8b-instruct-fp8-fast",
+    "REWRITE_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8",
     "VALIDATOR_MODEL": "@cf/cloudflare/clef-flash",
     "DAILY_NEURON_BUDGET": "6000",
     "CONTEXT_CHARS": "6000",
