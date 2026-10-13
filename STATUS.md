@@ -7,6 +7,30 @@
 - Sessions/control are on `shurik-control/main`. The user stopped Shurik and the
   hourly Codex checkup on 2026-10-13; both remain stopped.
 
+## New-title rewrites, TypeScript and dark mode (2026-10-13)
+
+- All Worker, browser, test and verification-script sources are TypeScript, with
+  strict checks for each runtime. Node 24 runs typed tests/tools directly; Wrangler
+  builds browser assets automatically before asset upload. CI also runs the actual
+  workerd extraction, retirement, pipeline and batching checks.
+- Dark mode follows the system by default, with a persistent Hebrew light/dark/system
+  selector. External early theme initialization respects the existing CSP. Contrast,
+  keyboard controls, saved overrides/system changes and widths 320/390/768/1440 pass.
+- New/corrected titles take priority over older pending titles. The first generated
+  alternative preserves factual clauses; a conservative removal of standalone click
+  prompts can compete in the same full-context validation call. No threshold, budget,
+  context-access requirement or cached accepted policy is weakened.
+- `newTitleCoverage` prospectively measures retained new/corrected titles over the
+  last 24 hours. Baseline titles and unchanged copies are excluded; source failures,
+  rejections and pending titles remain in the denominator. This measures conversion,
+  not factual accuracy; empty cohorts never claim the 90% target is met.
+- Validation: 82 unit tests, strict type checks, build, Worker smoke, extraction,
+  retirement, end-to-end pipeline, batching/budget and browser interaction checks pass.
+- Production 90% remains unproven. The pre-deployment 22:14 UTC snapshot has 60/239
+  converted (25.1%), 122 unavailable bodies, 40 rejected, 17 pending, and 5,935/6,000
+  reserved/used daily neurons. Keep inaccessible originals under the existing rule.
+  Shurik and both Codex check-ins remain disabled.
+
 ## Rewrite coverage and UI (2026-10-13)
 
 - Three grounded alternatives per article; native Clef Flash choice plus separate

@@ -1,19 +1,39 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "positivity-bias",
-  "main": "src/worker.js",
+  "main": "src/worker.ts",
   "compatibility_date": "2026-10-13",
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": [
+      "/api/*"
+    ]
   },
   "durable_objects": {
-    "bindings": [{ "name": "NEWS", "class_name": "NewsStore" }]
+    "bindings": [
+      {
+        "name": "NEWS",
+        "class_name": "NewsStore"
+      }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["NewsStore"] }],
-  "triggers": { "crons": ["7 * * * *"] },
-  "ai": { "binding": "AI" },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "NewsStore"
+      ]
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "7 * * * *"
+    ]
+  },
+  "ai": {
+    "binding": "AI"
+  },
   "vars": {
     "REWRITE_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8",
     "VALIDATOR_MODEL": "@cf/cloudflare/clef-flash",
@@ -21,5 +41,10 @@
     "CONTEXT_CHARS": "6000",
     "MAX_CONTEXT_FETCHES": "40"
   },
-  "observability": { "enabled": true }
+  "observability": {
+    "enabled": true
+  },
+  "build": {
+    "command": "npm run build:client"
+  }
 }

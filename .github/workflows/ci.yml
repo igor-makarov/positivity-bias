@@ -19,3 +19,4 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run check && npm test && npm run build
+      - run: npm run test:extract && npm run test:retirement && npm run test:pipeline && npm run test:batch

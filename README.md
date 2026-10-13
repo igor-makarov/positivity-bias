@@ -5,6 +5,10 @@ articles, and a broad reading order that rotates categories and sources. Difficu
 news remains visible. No sentiment scoring, viral ranking, infinite scrolling,
 sensational imagery, or tracking.
 
+The display follows the device's light/dark preference by default. The Hebrew
+color-theme selector saves an explicit light/dark override; “לפי המכשיר” resumes
+system changes. Storage failures preserve a working session theme.
+
 ## Name
 
 The chosen name is **במבט** — a short, memorable Hebrew name for "news in
@@ -15,20 +19,27 @@ the repository, Worker and deployment identities are unchanged.
 
 ## Development
 
+All application, browser, test and verification-script sources are TypeScript.
+Node 24 runs tests and tools directly with native type stripping; separate strict
+TypeScript projects check the Worker, browser and tools against their runtime APIs.
+Wrangler's build hook compiles `client/app.ts` and `client/theme.ts` into the static
+JavaScript assets on every build/deploy, including Cloudflare Git deployments.
+Generated JavaScript is ignored in Git.
+
 Node 24+:
 
 ```sh
 npm ci --ignore-scripts
 npm run dev
-npm run check
+npm run check        # strict TypeScript checks for Worker, browser, tests and tools
 npm test
 npm run build
 npm run test:worker   # Miniflare runtime check with fictional fixtures (builds first)
-npm run test:browser  # headless Chromium render check (builds first, needs Chromium on PATH)
+npm run test:browser  # shared Chromium render/interaction suite (builds first, needs Chromium on PATH)
 npm run test:interaction  # keyboard/interaction QA in headless Chromium (builds first)
 ```
 
-The three `dist`-based checks rebuild the bundle first and refuse to run against a
+`test:browser` uses the shared Chromium interaction/render suite. The `dist`-based checks rebuild the bundle first and refuse to run against a
 missing or stale `dist/worker.js`, so a runtime check always exercises the current
 source rather than an old build. `build` bundles the Worker with Wrangler's dry run;
 it does not publish. Live
@@ -40,7 +51,7 @@ workerd checks: `npm run test:worker` (fixtures), `npm run test:extract`
 `npm run test:pipeline` (mock-model end-to-end), `npm run test:batch`
 (validator-window batch splitting) and `npm run test:interaction` (keyboard Tab
 traversal, source/category filters, chronological toggle, load-more pagination
-and the rendered error/retry state).
+the rendered error/retry state, saved/system color themes, text contrast, and responsive widths).
 
 ## Cloudflare deployment
 
@@ -74,7 +85,7 @@ default `@cf/meta/llama-3.1-8b-instruct-fp8-fast` is no longer listed in Cloudfl
 model catalog and is retained only as an overridable allowlist entry. The cheap
 allowlist also permits Llama 3.2 1B/3B. Expensive or paid-only models are blocked.
 Qwen3's thinking phase is disabled and its chat-style response envelope is handled;
-live Hebrew-quality and neuron-use measurement against the account is still pending.
+native live inference has been measured, but model scores do not establish factual accuracy.
 
 Each refresh fetches the **full accessible article text** for the candidates it can
 afford, strips navigation, advertising and unrelated recommendations, and passes the
@@ -83,7 +94,15 @@ or missing) to the model. The editorial prompt requires the primary point and it
 material context — actor/speaker, action, geographic scope and result — and never
 reverses an outcome. Missing context keeps the original headline.
 
-The rewrite call proposes three distinct dry alternatives per article. In one native
+The rewrite call proposes three distinct dry alternatives per article. The first
+preserves the original factual clauses with minimal editing. Where possible, a
+conservative candidate removes standalone click prompts without removing facts;
+it competes in the same validation call, with no extra inference or weaker checks.
+New and corrected titles take priority over the retained backlog. `/api/status`
+reports `newTitleCoverage` for retained titles first seen or corrected since tracking
+started, within the past 24 hours. Blocked/rejected/pending titles remain in the
+denominator; unchanged copies never count as conversions. Its 90% target is a
+conversion target, not a measured guarantee of factual accuracy. In one native
 Clef Flash call, two independent `noul` checks per alternative assess factual support
 and preservation of the primary point and material context; a `choice` question ranks
 the alternatives and provides an explicit original fallback. Both checks must reach

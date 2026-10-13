@@ -6,3 +6,5 @@ dist/
 !.env.example
 coverage/
 .probe-*
+public/app.js
+public/theme.js
