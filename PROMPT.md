@@ -14,8 +14,16 @@ and not to add more features yet. Focus on validation and concrete defects first
 
 A working Hebrew news aggregation outlet on Cloudflare Workers that reduces
 sensational framing and negativity bias while preserving factual completeness.
-The provisional name is **במבט**, with the tagline **חדשות בפרופורציה**.
-Other proposals: **בקצרה**, **קו נקי**, **בלי רעש**. Do not rename every iteration.
+The user has chosen **במבט** as the site name. Keep it consistently.
+Remove the English **POSITIVITY BIAS** / **Positivity Bias** subtitle from the
+visible header/logo and any other visitor-facing branding. Do not replace it with
+another English subtitle. The existing Hebrew slogans and taglines, including
+**חדשות בפרופורציה** and **אותן עובדות, פחות דרמה**, are sufficient. Keep them;
+no additional slogans or rebranding are needed. Fix spacing left by removal of the
+brand-caption element. This is a small authorized branding correction, not a repo,
+Worker, deployment, or domain rename; keep the existing deployment identities.
+The current public/index.html header still contains the POSITIVITY BIAS span, so
+this change has not yet been implemented. Shurik should make it in its next pass.
 
 ## Urgent correction — factual reversal reported by the user
 
