@@ -57,7 +57,14 @@ export async function readArticleData(html) {
         if (VOID.has(tag)) return;
         const classId = `${element.getAttribute('class') || ''} ${element.getAttribute('id') || ''}`;
         const noise = NOISE_TAGS.has(tag) || NOISE_PATTERN.test(classId);
-        const frame = { noise, content: !noise && (tag === 'article' || tag === 'main') };
+        // The primary content region (<main>) is authoritative. A generic layout wrapper
+        // whose class merely contains a noise word (e.g. Bootstrap's "row navigation")
+        // must not suppress the whole article, so entering <main> suspends the inherited
+        // skip depth and leaving it restores that depth. Noise INSIDE <main> (ads, sharing,
+        // related) still skips normally, and a genuine noise ancestor around a nested
+        // <article> (e.g. a recommendation card) still suppresses it.
+        const reset = tag === 'main' && !noise;
+        const frame = { noise, reset, savedSkip: 0, content: !noise && (tag === 'article' || tag === 'main') };
         // Real pages contain elements the parser never closes (e.g. SVG <path>).
         // Registering an end-tag handler for them throws "Parser error: No end tag."
         // and would abort the whole extraction, so treat those as having no subtree.
@@ -66,8 +73,10 @@ export async function readArticleData(html) {
             if (frames[frames.length - 1] === frame) frames.pop();
             else { const at = frames.lastIndexOf(frame); if (at >= 0) frames.splice(at, 1); }
             if (frame.noise) skipDepth--;
+            if (frame.reset) skipDepth = frame.savedSkip;
           });
         } catch { return; }
+        if (reset) { frame.savedSkip = skipDepth; skipDepth = 0; }
         if (noise) skipDepth++;
         frames.push(frame);
       },

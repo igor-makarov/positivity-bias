@@ -33,5 +33,14 @@ try {
   const thin = await (await mf.dispatchFetch('https://probe.local/?case=thin')).json();
   assert.equal(thin.completeness, 'missing');
   assert.equal(thin.body, '');
-  console.log('Extraction passed: article body kept (self-closing SVG tolerated), navigation/advertising/related/footer removed, JSON-LD metadata read, bot-block and thin shells rejected.');
+  // A generic outer wrapper whose class happens to contain a noise word (e.g. Bootstrap's
+  // "row navigation") must not suppress the whole page: the <main> article body survives
+  // while noise inside <main> and a recommendation card under a noise <aside> are removed.
+  const layout = await (await mf.dispatchFetch('https://probe.local/?case=layout')).json();
+  assert.equal(layout.completeness, 'complete');
+  assert.match(layout.body, /גוף הכתבה המלא/);
+  for (const noise of ['דף הבית', 'ספורט', 'שיתוף', 'כתבה מומלצת', 'כל הזכויות שמורות']) {
+    assert.ok(!layout.body.includes(noise), `noise leaked through the layout wrapper: ${noise}`);
+  }
+  console.log('Extraction passed: article body kept (self-closing SVG tolerated), navigation/advertising/related/footer removed, a noise-named layout wrapper does not suppress <main>, JSON-LD metadata read, bot-block and thin shells rejected.');
 } finally { await mf.dispose(); await rm(directory, { recursive: true, force: true }); }

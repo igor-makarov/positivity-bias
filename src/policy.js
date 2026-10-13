@@ -3,7 +3,12 @@
 // pipeline (or an older grounding/verification policy) can never be displayed.
 
 export const EDITORIAL_VERSION = 'editorial-v3';
-export const CONTEXT_POLICY = 'full-text-v2';
+// v2: bounded HTMLRewriter body extraction with navigation/advertising/related removed.
+// v3: a noise-named layout wrapper (e.g. Bootstrap's "row navigation") wrapping the
+// whole page no longer suppresses <main>; live Kan article pages now yield a complete
+// body instead of a 42-char navigation shell. Any rewrite grounded on the older
+// extraction is retired by the existing fingerprint path and reprocessed progressively.
+export const CONTEXT_POLICY = 'full-text-v3';
 // v2: clef-flash is driven through its documented decision schema (state + typed
 // yes/no questions), not the chat completion shape that its API does not accept.
 // v3: a candidate is accepted only on a confident yes; a weakly-positive or uncertain

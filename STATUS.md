@@ -7,6 +7,27 @@
 - Sessions/control are on `shurik-control/main`; iterations continue immediately
   (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
+## Verified (2026-10-13, iteration 2-15)
+
+32. **Live Kan article bodies were silently dropped by an over-broad noise wrapper.**
+    The body extractor treats any element whose class/id contains a noise token
+    (`nav`/`navigation`/`menu`/`share`/`related`/...) as removable and suppresses its
+    whole subtree with a `skipDepth` counter. Live Kan pages wrap the entire page,
+    including `<main>`, in `<div class="row navigation">`, so `skipDepth` stayed above
+    zero for the whole article and every Kan article extracted as a 42-char navigation
+    shell (`missing`) — including the exact reported drone-test article. Entering a
+    non-noise `<main>` now suspends the inherited skip depth and leaving it restores that
+    depth, so the primary content region is authoritative while noise INSIDE `<main>`
+    (ads, sharing, related) and a recommendation `<article>` nested under a noise
+    `<aside>` are still removed. Measured on live pages: Kan defense/politic/global
+    articles now extract `complete` 1,680/1,919/2,364-char bodies (was 42 → `missing`),
+    including the drone-test article ("הניסוי, שנערך בהצלחה"); ynet (4,262/2,213) and
+    mako (1,872) extraction is byte-for-byte unchanged. `CONTEXT_POLICY` is bumped to
+    `full-text-v3`, so rewrites grounded on the older extraction are retired at read
+    time and reprocessed progressively under the same daily budget. New `npm run
+    test:extract` fixture (a noise-named layout wrapper around `<main>`) was shown to
+    fail pre-fix (`missing`) and pass after it; all other checks pass.
+
 ## Verified (2026-10-13, iteration 2-14)
 
 30. **A clef response that decided NONE of the candidates was reported as a healthy
@@ -339,23 +360,22 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Latest full validation (iteration 2-14): `npm run check`, **62 unit tests**,
-`npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`
-(adds the current-fingerprint generated-headline rejection serve-time regression),
-`npm run test:pipeline` (mock model end-to-end, retire/reprocess, honest
-invalid-response status, the model-omission retry and the failed-verification case),
-`npm run test:batch` (validator-window splitting, budget-aware reduction and the
-documented clef decision schema), `npm run test:browser` and `npm run test:interaction`
-all pass. The new clef-decision-invariant unit and pipeline regressions were shown to
-fail against the pre-fix code (an undecided verification reported as `ok`) and pass
-after it; the model-table unit test was shown to fail against the stale windows/rates
-and pass after the correction.
+Latest full validation (iteration 2-15): `npm run check`, **62 unit tests**,
+`npm run build`, `npm run test:worker`, `npm run test:extract` (now also proves a
+noise-named layout wrapper does not suppress `<main>`), `npm run test:retirement`,
+`npm run test:pipeline`, `npm run test:batch`, `npm run test:browser` and
+`npm run test:interaction` all pass. The layout-wrapper extraction regression was shown
+to fail against the pre-fix extractor (`missing`) and pass after it; live Kan/ynet/mako
+pages were re-measured and only Kan changed (42-char shell → complete body). Prior
+iteration 2-14 added the current-fingerprint generated-headline rejection serve-time
+regression and the clef-decision-invariant unit/pipeline regressions, each shown to
+fail against the pre-fix code and pass after it.
 
-Live re-check (iteration 2-9): four live ynet article pages and two live mako article
-pages extracted `complete` bodies (1,872–7,620 chars, one truncated at the 6,000-char
-cap) with JSON-LD headlines/sections; kan article pages remain client-rendered shells
-(42 chars → `missing`, original kept). A full live refresh (real feeds, mock model)
-ingested 126 articles across ynet/kan/n12/mako, all `ok`, with real full-text context.
+Live re-check (iteration 2-15): live Kan defense/politic/global article pages now
+extract `complete` bodies (1,680–2,364 chars) instead of a 42-char navigation shell,
+including the exact reported drone-test article; live ynet (4,262/2,213) and mako
+(1,872) extraction is unchanged. Kan still exposes no `articleSection`, so its
+categories remain missing by policy.
 
 ## Blocked / needs input
 
@@ -368,8 +388,8 @@ ingested 126 articles across ynet/kan/n12/mako, all `ok`, with real full-text co
    neuron use remain unmeasured. Mocks/fixtures prove wiring and fallbacks only. Switch
    the default to Qwen3 only after measured live checks. Do not interpret a passing
    fixture as successful production inference. Real-article extraction was re-exercised
-   against live pages in iteration 2-9; mako/N12 now served extractable pages, kan
-   remains a client-rendered shell.
+   against live pages in iterations 2-9/2-15; mako/N12 serve extractable pages and Kan
+   now extracts a complete body after the 2-15 layout-wrapper fix (see above).
    Iteration 2-14 found the default rewrite model's docs page gone: requesting
    `.../workers-ai/models/llama-3.1-8b-instruct-fp8-fast/` now redirects to
    `/workers-ai/models/?unavailable=llama-3.1-8b-instruct-fp8-fast` ("deprecated,

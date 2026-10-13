@@ -30,7 +30,28 @@ const blockHtml = `<!doctype html><html lang="en"><head><title>Radware Block Pag
 // A client-rendered shell whose initial HTML is only navigation chrome.
 const thinHtml = `<!doctype html><html lang="he"><body><nav><a href="/">דף הבית</a><a href="/sport">ספורט</a></nav><main><p>טוען את הכתבה</p></main></body></html>`;
 
-const pages = { article: articleHtml, block: blockHtml, thin: thinHtml };
+// A real-world layout defect: a generic outer wrapper whose class merely contains a
+// noise word (Bootstrap's "row navigation") wraps the whole page, including <main>.
+// The article body must still be extracted while noise inside <main> (sharing, related
+// recommendations) and a recommendation card under a noise <aside> are removed.
+const layoutHtml = `<!doctype html><html lang="he"><head>
+  <script type="application/ld+json">{"@type":"NewsArticle","headline":"כותרת לדוגמה","articleSection":"בארץ"}</script>
+</head><body>
+  <div class="row navigation">
+    <header class="header nd-header"><nav class="side-menu-nav"><a href="/">דף הבית</a><a href="/sport">ספורט</a></nav></header>
+    <main id="main" class="container-fluid g-0">
+      <article>
+        <h1>כותרת לדוגמה</h1>
+        <p>גוף הכתבה המלא נמצא כאן, כולל הפרטים החשובים שקורא צריך כדי להבין את האירוע. הפסקה מפרטת את מה שקרה, למי זה קרה, היכן זה קרה ומה התוצאה בפועל, בלי הבטחות מיותרות.</p>
+        <div class="share-tools"><span>שיתוף בטלגרם</span></div>
+        <aside class="related-articles"><article><p>כתבה מומלצת</p></article></aside>
+      </article>
+    </main>
+    <footer class="footer"><p>כל הזכויות שמורות</p></footer>
+  </div>
+</body></html>`;
+
+const pages = { article: articleHtml, block: blockHtml, thin: thinHtml, layout: layoutHtml };
 
 export default {
   async fetch(request) {
