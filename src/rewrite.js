@@ -111,6 +111,29 @@ function parseChoice(answer, candidate) {
   return answer;
 }
 
+function choiceShape(answer, candidate) {
+  const ids = [...headlineOptions(candidate).map(({ id }) => id), 'original'];
+  const probabilities = answer?.probabilities;
+  return {
+    valueType: typeof answer,
+    typedChoice: answer?.type === 'choice',
+    knownChoice: ids.includes(answer?.choice),
+    confidenceType: typeof answer?.confidence,
+    confidenceFinite: Number.isFinite(answer?.confidence),
+    probabilitiesType: typeof probabilities,
+    optionCount: probabilities && typeof probabilities === 'object' ? Object.keys(probabilities).length : 0,
+    knownOptions: probabilities && typeof probabilities === 'object' ? ids.filter((id) => Object.hasOwn(probabilities, id)).length : 0,
+    numericOptions: probabilities && typeof probabilities === 'object' ? ids.filter((id) => Number.isFinite(probabilities[id])).length : 0,
+    expectedOptions: ids.length,
+    confidence: Number.isFinite(answer?.confidence) ? Math.round(answer.confidence * 1000) / 1000 : null,
+    distributionSum: probabilities && ids.every((id) => Number.isFinite(probabilities[id]))
+      ? Math.round(ids.reduce((sum, id) => sum + probabilities[id], 0) * 1000) / 1000 : null,
+    selectedProbability: Number.isFinite(probabilities?.[answer?.choice]) ? Math.round(probabilities[answer.choice] * 1000) / 1000 : null,
+    maxProbability: probabilities && ids.every((id) => Number.isFinite(probabilities[id]))
+      ? Math.round(Math.max(...ids.map((id) => probabilities[id])) * 1000) / 1000 : null
+  };
+}
+
 function numberTokens(value) {
   return [...new Set(value.match(/\d+(?:[.,]\d+)*(?:%|‰)?/g) || [])];
 }
@@ -303,6 +326,7 @@ export async function verifyBatch(candidates, env, { model = env.VALIDATOR_MODEL
   if (!env.AI || !candidates.length) return { ...empty, status: 'not_configured' };
   if (!isClefModel(model)) return { ...empty, status: 'validator_misconfigured' };
   const accepted = new Map(), rejected = new Set(), answered = new Set();
+  let answerShape = null;
   let usage = 0, completeUsage = true, failed = false;
   for (const chunk of planVerificationBatches(candidates, { model })) {
     let payload;
@@ -313,6 +337,7 @@ export async function verifyBatch(candidates, env, { model = env.VALIDATOR_MODEL
     const answers = parseClefAnswers(payload);
     if (!answers) { failed = true; break; }
     chunk.forEach((candidate, index) => {
+      answerShape ||= choiceShape(answers[`${index}_headline`], candidate);
       const answer = parseChoice(answers[`${index}_headline`], candidate);
       if (!answer) return;
       answered.add(candidate.id);
@@ -328,5 +353,5 @@ export async function verifyBatch(candidates, env, { model = env.VALIDATOR_MODEL
   }
   const evaluated = new Set([...accepted.keys(), ...rejected]);
   const status = failed ? 'provider_unavailable' : accepted.size === candidates.length ? 'ok' : accepted.size ? 'partial' : 'rejected';
-  return { accepted, rejected, evaluated, answered, status, usage: completeUsage && !failed ? usage : null };
+  return { accepted, rejected, evaluated, answered, answerShape, status, usage: completeUsage && !failed ? usage : null };
 }

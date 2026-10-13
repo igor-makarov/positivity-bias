@@ -259,6 +259,7 @@ export class NewsStore {
       diagnostics.verified += verified.evaluated?.size ?? 0;
       diagnostics.choiceAnswered += verified.answered?.size ?? 0;
       diagnostics.uncertainChoices += (verified.answered?.size ?? 0) - (verified.evaluated?.size ?? 0);
+      if (verified.answerShape) diagnostics.choiceAnswerShape = verified.answerShape;
       diagnostics.accepted += verified.accepted.size;
       if (rewrite.candidates.length && (verified.answered?.size ?? 0) === 0) diagnostics.failureStage = 'verification';
       // Unknown usage keeps its reservation; never treat absent provider usage as zero.
