@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_DAILY_NEURON_BUDGET, MAX_DAILY_NEURON_BUDGET, budgetDecision, dailyNeuronBudget, estimateNeurons, estimateTokens, planBatches, requestContextTokens } from '../src/budget.js';
+import { DEFAULT_DAILY_NEURON_BUDGET, MAX_DAILY_NEURON_BUDGET, budgetDecision, dailyNeuronBudget, estimateBatchNeurons, estimateNeurons, estimateTokens, fitBatchToBudget, planBatches, requestContextTokens } from '../src/budget.js';
 
 test('The daily budget defaults conservatively and never exceeds the free allocation', () => {
   assert.equal(dailyNeuronBudget({}), DEFAULT_DAILY_NEURON_BUDGET);
@@ -55,4 +55,20 @@ test('Output space is reserved per article, not as a fixed amount', () => {
   assert.equal(batches.flat().length, 10);
   assert.ok(batches.length > 1); // 10 * (3000 input + 180 output) cannot fit one 32k request
   for (const batch of batches) assert.ok(1600 + batch.length * 3000 + batch.length * 180 <= 32_768);
+});
+
+test('Batch size is reduced to the remaining daily budget without truncating context', () => {
+  const models = { rewrite: '@cf/qwen/qwen3-30b-a3b-fp8', validator: '@cf/cloudflare/clef-flash' };
+  const items = Array.from({ length: 5 }, (_, index) => ({ id: `c${index}`, contextLength: 6000 }));
+  const one = estimateBatchNeurons(models, items.slice(0, 1));
+  const two = estimateBatchNeurons(models, items.slice(0, 2));
+  assert.ok(one > 0 && two > one); // cost grows with the number of articles
+  // A budget that fits exactly one article must reduce the request, not defer it all.
+  const fitted = fitBatchToBudget(items, models, one + 1);
+  assert.equal(fitted.length, 1);
+  assert.equal(fitted[0].contextLength, 6000); // context is never shortened to make room
+  assert.deepEqual(fitBatchToBudget(items, models, two + 1).map((item) => item.id), ['c0', 'c1']);
+  assert.equal(fitBatchToBudget(items, models, one - 1).length, 0); // defer instead of overspending
+  assert.equal(fitBatchToBudget(items, models, 0).length, 0);
+  assert.equal(fitBatchToBudget(items, models, Number.NaN).length, 0);
 });

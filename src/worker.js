@@ -4,7 +4,7 @@ import { ingestSource, loadArticleContext } from './ingest.js';
 import { DEFAULT_CONTEXT_CHARS } from './extract.js';
 import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, needsRewrite, policyFingerprint, retireStaleRewrites, sourceFingerprint } from './policy.js';
 import { rewriteBatch, verifyBatch } from './rewrite.js';
-import { OUTPUT_TOKENS_PER_ITEM, budgetDecision, dailyNeuronBudget, estimateNeurons, estimateTokens, planBatches, requestContextTokens } from './budget.js';
+import { budgetDecision, dailyNeuronBudget, estimateBatchNeurons, fitBatchToBudget, planBatches, requestContextTokens } from './budget.js';
 
 const sources = validateWebsites(configuration);
 const HOUR = 3_600_000;
@@ -153,16 +153,19 @@ export class NewsStore {
       { model, contextTokens: contextLimit });
     if (!batches.length) { snapshot.rewriteStatus = 'context_unavailable'; return; }
     const day = this.usageDay(now);
+    const budget = dailyNeuronBudget(this.env);
+    const models = { rewrite: model, validator };
     let accepted = 0, deferred = false, providerFailed = false;
     for (const batch of batches) {
-      const count = batch.length;
-      const inputChars = batch.reduce((sum, item) => sum + item.contextLength, 0);
-      const rewriteInput = estimateTokens('x'.repeat(inputChars)) + 400;
-      const estimate = estimateNeurons(model, rewriteInput, OUTPUT_TOKENS_PER_ITEM * count)
-        + estimateNeurons(validator, rewriteInput + 200 * count, OUTPUT_TOKENS_PER_ITEM * count);
+      // Size this request by the remaining daily budget as well as the context window,
+      // so a large planned batch is reduced rather than deferring every article when
+      // only part of it fits. Context is never truncated to make room.
+      const sized = fitBatchToBudget(batch, models, Math.max(0, budget - this.readUsage(day)));
+      if (!sized.length) { deferred = true; break; }
+      const estimate = estimateBatchNeurons(models, sized);
       const reservation = this.reserveUsage(day, estimate);
       if (!reservation.allowed) { deferred = true; break; }
-      const items = batch.map(({ article, context, completeness }) => ({ id: article.id, sourceName: article.sourceName,
+      const items = sized.map(({ article, context, completeness }) => ({ id: article.id, sourceName: article.sourceName,
         originalHeadline: article.originalHeadline, publishedAt: article.publishedAt,
         context, contextCompleteness: completeness }));
       const rewrite = await rewriteBatch(items, this.env, { model });
@@ -187,7 +190,7 @@ export class NewsStore {
       // articles are not re-fetched and re-inferred every refresh. Provider/parse
       // failures and missing context are not cached and may be retried.
       if (['ok', 'partial', 'rejected'].includes(rewrite.status) && ['ok', 'partial', 'rejected'].includes(verified.status)) {
-        for (const { article } of batch) {
+        for (const { article } of sized) {
           if (verified.accepted.has(article.id)) continue;
           article.rewriteStatus = 'rejected';
           article.rewriteFingerprint = fingerprint;

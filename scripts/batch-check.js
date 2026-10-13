@@ -69,5 +69,24 @@ try {
   const day = new Date().toISOString().slice(0, 10);
   const usage = await (await store.fetch(`https://news.internal/usage?day=${day}`)).json();
   assert.ok(usage.used > 0 && usage.used <= 6000, `unexpected usage ${usage.used}`);
-  console.log(`Batch passed: ${COUNT} full-text articles split into ${run.calls.rewrite} requests, each verification within the ${window}-token validator window; usage ${Math.round(usage.used)} neurons.`);
+
+  // Budget-aware sizing: when only part of a planned batch fits the remaining daily
+  // budget, the request must be REDUCED rather than deferring every article. A fresh
+  // Durable Object starts with a zero ledger, so the exact fit is deterministic.
+  const partialStore = namespace.get(namespace.idFromName('partial'));
+  const partialSeed = { articles, updatedAt: new Date(now - 60_000).toISOString(),
+    lastAttemptAt: new Date(now - 2 * 3_600_000).toISOString(), policyFingerprint: null, rewriteStatus: 'not_configured', sources: [] };
+  const partial = await (await partialStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: partialSeed,
+    env: { REWRITE_MODEL: '@cf/meta/llama-3.1-8b-instruct-fp8-fast', VALIDATOR_MODEL: '@cf/cloudflare/clef-flash',
+      DAILY_NEURON_BUDGET: '60', CONTEXT_CHARS: '6000', MAX_CONTEXT_FETCHES: '20' } }) })).json();
+  assert.equal(partial.result.state, 'complete');
+  assert.equal(partial.calls.rewrite, 1); // one article fits the 60-neuron budget; the rest defer
+  assert.equal(partial.calls.verify, 1);
+  const partialSnapshot = await (await partialStore.fetch('https://news.internal/snapshot')).json();
+  assert.equal(partialSnapshot.articles.filter((article) => article.rewriteStatus === 'rewritten').length, 1);
+  assert.equal(partialSnapshot.articles.filter((article) => article.rewriteStatus === 'original').length, COUNT - 1);
+  const partialUsage = await (await partialStore.fetch('https://news.internal/usage')).json();
+  assert.ok(partialUsage.used > 0 && partialUsage.used <= 60, `partial usage overspent: ${partialUsage.used}`);
+
+  console.log(`Batch passed: ${COUNT} full-text articles split into ${run.calls.rewrite} requests, each verification within the ${window}-token validator window; usage ${Math.round(usage.used)} neurons; a 60-neuron budget rewrites one article instead of deferring all.`);
 } finally { await mf.dispose().catch(() => {}); await rm(directory, { recursive: true, force: true }).catch(() => {}); }

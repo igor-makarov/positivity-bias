@@ -36,6 +36,31 @@ export function budgetDecision(used, estimate, budget) {
   return { allowed: true, remaining: remaining - estimate };
 }
 
+// Estimated neuron cost of ONE shared rewrite+verification request for these items:
+// the full-text input goes to both models, and each reserves one complete short result.
+// Kept in one place so the ledger, the context plan and the budget plan agree.
+export function estimateBatchNeurons(models, items = []) {
+  const count = items.length;
+  const inputChars = items.reduce((sum, item) => sum + (item.contextLength ?? String(item.context ?? '').length), 0);
+  const rewriteInput = estimateTokens('x'.repeat(inputChars)) + 400;
+  return estimateNeurons(models.rewrite, rewriteInput, OUTPUT_TOKENS_PER_ITEM * count)
+    + estimateNeurons(models.validator, rewriteInput + 200 * count, OUTPUT_TOKENS_PER_ITEM * count);
+}
+
+// Reduce a context-sized batch to the largest prefix whose estimated cost fits the
+// remaining daily budget, so a large planned request is not deferred wholesale when
+// only part of it fits. Article context is never truncated; when not even one item
+// fits, returns [] so the caller defers the work instead of overspending.
+export function fitBatchToBudget(items, models, remaining) {
+  if (!Number.isFinite(remaining) || remaining <= 0) return [];
+  const fitted = [];
+  for (const item of items) {
+    if (estimateBatchNeurons(models, [...fitted, item]) > remaining) break;
+    fitted.push(item);
+  }
+  return fitted;
+}
+
 // The shared article context is sent to BOTH the rewrite model and the validator, so
 // a request may only be as large as the smallest context window in the pair. Every
 // model contributes its documented window, or the conservative default when unknown,

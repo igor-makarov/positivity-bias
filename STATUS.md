@@ -7,6 +7,23 @@
 - Sessions/control are on `shurik-control/main`; iterations continue immediately
   (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
+## Verified (2026-10-13, iteration 2-8)
+
+16. **Budget-aware batch sizing.** `planBatches` sized requests by the context window
+    only; the remaining daily neuron budget was a yes/no gate per pre-planned batch, so
+    a batch larger than what was left deferred **every** article in it even though some
+    could fit. New `estimateBatchNeurons`/`fitBatchToBudget` (`src/budget.js`) reduce a
+    context-sized batch to the largest prefix whose estimated rewrite+verify cost fits
+    the remaining budget, without truncating article context; `src/worker.js` uses them
+    per request. This directly satisfies "size each request from the actual full-text
+    input, model context window, reserved output space, and remaining daily neuron
+    budget". Unit regressions cover the fit/truncate/overspend cases; `npm run test:batch`
+    now runs a fresh Durable Object with a 60-neuron budget and proves one article is
+    rewritten (1 rewrite + 1 verify call) instead of deferring all nine, with usage ≤ 60.
+    The new integration assertion was shown to fail against the pre-fix per-batch gate
+    (0 rewrite calls) and pass after the fix. Existing budget=0 deferral, full-budget
+    throughput, retirement and reprocessing behaviour is unchanged.
+
 ## Verified (2026-10-13, iteration 2-7)
 
 14. **Missing-fingerprint retirement defect fixed.** `retireStaleRewrites` treated an
@@ -136,12 +153,12 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Latest full validation (iteration 2-7): `npm run check`, **49 unit tests**,
+Latest full validation (iteration 2-8): `npm run check`, **50 unit tests**,
 `npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
 `npm run test:pipeline` (mock model end-to-end + retire/reprocess), `npm run test:batch`
-(validator-window splitting), `npm run test:browser` and `npm run test:interaction` all
-pass. The missing-fingerprint retirement regression was shown to fail against the
-pre-fix logic and pass after the fix. (Iteration 2-5 ran the full battery twice.)
+(validator-window splitting + budget-aware reduction), `npm run test:browser` and
+`npm run test:interaction` all pass. The budget-aware batch regression was shown to
+fail against the pre-fix logic and pass after it. (Iteration 2-5 ran the full battery twice.)
 
 ## Blocked / needs input
 
