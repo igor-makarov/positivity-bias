@@ -1,4 +1,4 @@
-# במבט · Positivity Bias
+# במבט
 
 Hebrew news in perspective: publisher categories, dry headlines, links to original
 articles, and a broad reading order that rotates categories and sources. Difficult
@@ -33,7 +33,9 @@ npm run test:browser  # headless Chromium render check (build first, needs Chrom
 `build` bundles the Worker with Wrangler's dry run; it does not publish. Live
 headlines are never replaced with sample articles. The first request starts a
 bounded background refresh; reload after it finishes. Wrangler local development
-needs outbound access to the publisher hosts for live aggregation.
+needs outbound access to the publisher hosts for live aggregation. Additional
+workerd checks: `npm run test:worker` (fixtures), `npm run test:extract`
+(full-text extraction) and `npm run test:retirement` (stale-cache retirement).
 
 ## Cloudflare deployment
 
@@ -60,24 +62,44 @@ Cloudflare authentication outside the connected Builds runner.
 
 Rewrites use **Cloudflare Workers AI**, with the native `AI` binding declared in
 `wrangler.jsonc`. No inference API key is needed. The Actions OCGO key is only
-for Shurik. The inexpensive default is `@cf/meta/llama-3.1-8b-instruct-fp8-fast`;
-the allowlist also permits Llama 3.2 1B and 3B. Expensive models are blocked.
+for Shurik. The inexpensive default is `@cf/meta/llama-3.1-8b-instruct-fp8-fast`.
+The cheap allowlist also permits `@cf/qwen/qwen3-30b-a3b-fp8` (documented Hebrew
+support, lower output price) and Llama 3.2 1B/3B. Expensive or paid-only models
+are blocked. Qwen3's thinking phase is disabled and its chat-style response
+envelope is handled; switching the default still requires measured Hebrew-quality
+checks against the live account.
 
-The hard rewrite budget is **8 headline attempts per hourly refresh**, in one batch
-with at most **1024 output tokens**. At Cloudflare's published prices, typical
-usage at this volume should fit comfortably within the **10,000-neuron/day** free
-allocation; this is an estimate, not measured usage, and the allowance is shared
-with other Workers AI use in the account. See [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/).
-Do not upgrade billing or switch to paid-only models. Shurik must validate Hebrew
-quality and actual usage before increasing scope.
+Each refresh fetches the **full accessible article text** for the candidates it can
+afford, strips navigation, advertising and unrelated recommendations, and passes the
+publisher, original headline, publication time and body (marked complete, truncated
+or missing) to the model. The editorial prompt requires the primary point and its
+material context — actor/speaker, action, geographic scope and result — and never
+reverses an outcome. Missing context keeps the original headline.
 
-Accepted rewrites are persisted and reused while source title/excerpt and model
-configuration are unchanged. The original remains visible. Missing AI binding, quota/provider
-failures, rejected numbers/uncertainty changes, newly added sensational framing or
-rhetorical questions, and insufficient context fall back to an explicitly labeled
-original title. Automated guards cannot fully prove factual
-fidelity; editorial review is still useful. Set `REWRITES_PER_REFRESH` to 0 to pause
-new inference without removing accepted headlines.
+A candidate is then checked with `@cf/cloudflare/clef-flash`, which answers two
+separate questions: is every claim supported by the source, and are the primary point
+and material context preserved without misleading omission, broadening, narrowing or
+changed emphasis? A candidate is accepted only when both are true; anything
+unsupported, incomplete or uncertain falls back to the preserved original.
+
+Requests are sized adaptively from the full-text input, the model context window,
+reserved output space and the remaining daily budget. The project reserves a
+conservative slice of the shared **10,000-neuron/day** free allocation
+(`DAILY_NEURON_BUDGET`, default 6000), persists the reservation before any model
+call, reconciles it with provider-reported usage, and defers work instead of
+overspending. No billing upgrade, retries or automatic budget increase.
+
+Accepted rewrites are cached with a policy fingerprint covering the model, the
+full-context extraction policy, the editorial prompt and the validator version. At
+read/serve time, and through a persisted idempotent migration, any rewrite whose
+fingerprint does not match the active policy is retired: the generated headline is
+cleared, the original returns to display, and the article is reprocessed
+progressively under the same daily budget. Full article text is inference context
+only — it is never shown in the UI, returned by the public API, or written to Git.
+The original remains visible, and rejected numbers/uncertainty changes, newly added
+sensational framing, rhetorical questions, outcome reversals and insufficient
+context all fall back to an explicitly labeled original title. Automated guards
+cannot fully prove factual fidelity; editorial review is still useful.
 
 **No model classification is currently needed.** If a concrete classification
 need arises, use `@cf/cloudflare/clef-flash` as requested. Categories come from RSS category fields,
@@ -85,7 +107,8 @@ publisher feed names, JSON-LD `articleSection`, or article metadata. Unknown sta
 unknown. Root [`websites.json`](websites.json) controls the four initial publishers.
 Each feed has a source-provided fallback label and explicit allowed hosts. N12
 uses Mako's official syndication endpoint; shared Mako/N12 article IDs deduplicate.
-Short excerpts provide rewrite context and are not returned by the public API.
+Full accessible article text is used transiently for rewrite context and is never
+returned by the public API or written to Git.
 The archive retains up to 480 articles from the last 72 hours.
 
 ## Shurik on main

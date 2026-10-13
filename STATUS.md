@@ -1,67 +1,62 @@
 # Current state
 
-- Bootstrapped Hebrew RTL Worker on `main`: configurable source registry; RSS/Atom
-  and Kan news-sitemap adapters; category/source rotation; hourly ingestion; SQLite
-  Durable Object storage; guarded Workers AI rewrites (originals preserved).
-- Provisional Hebrew name: **במבט**. Alternatives: **בקצרה**, **קו נקי**, **בלי רעש**.
-- Sessions/control are on `shurik-control/main`; coding iterations wait ≥1 hour.
+- Hebrew RTL news Worker on `main`: configurable source registry; RSS/Atom and Kan
+  news-sitemap adapters; category/source rotation; hourly ingestion; SQLite Durable
+  Object storage; guarded Workers AI rewrites with originals preserved.
+- Chosen name: **במבט**. English subtitle removed from the visible header/logo.
+- Sessions/control are on `shurik-control/main`; iterations continue immediately
+  (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
-## Verified this iteration (2026-10-13)
+## Verified this iteration (2026-10-13, iteration 2-3)
 
-0. **Local runtime smoke test fixed.** Root cause of the HTTP 500: the raw Miniflare
-   v4 options passed to `convertV4MiniflareOptions` did not mark the Worker as the
-   user worker, so the assets router refused to dispatch `/api/*`
-   (`routerConfig.has_user_worker` was false). Added
-   `routerConfig: { has_user_worker: true }` to `scripts/smoke.js`. `npm run
-   test:worker` now passes: SQLite persistence, all four adapters, HTMLRewriter
-   metadata, original fallback without an AI binding, categories, API filters,
-   cooldown, and static assets. Fixtures stay inside Miniflare.
-2. **Real publisher endpoints validated from the runner** (2026-10-13, all HTTP 200,
-   `application/xml`/`text/xml`): ynet `StoryRss2/3/6/538/8`, Kan
-   `media/sitemap/news/sitemap.xml`, mako `news-military|law|money|world`, and the
-   four `rcs.mako.co.il/rss/c...` feeds.
-   - **ynet feed labels were wrong** and are repaired in `websites.json` using the
-     published channel titles: `StoryRss3` = ספורט (was כלכלה), `StoryRss6` = כלכלה
-     (was ספורט), `StoryRss538` = תרבות ובידור (was תרבות). `StoryRss8` is the ynet
-     **home page** (`ynet - דף הבית`), not health, so it was removed rather than
-     mislabeled. No publisher health feed exists among the checked StoryRss ids.
-   - Live workerd refresh (real network, `REWRITES_PER_REFRESH=0`):
-     `ynet=ok(114) kan=ok(8) n12=ok(74) mako=ok(58)`; ynet categories now match
-     content (חדשות/ספורט/כלכלה/תרבות ובידור); n12/mako labels match channel titles.
-   - Kan JSON-LD supplies headline/description/date but **no `articleSection`**, so
-     Kan categories remain missing (per the invariant). Note for tooling: plain Node
-     has no `HTMLRewriter` global, so Node-only live checks misreport Kan as
-     `fetch_failed`; Kan metadata must be exercised under workerd/Miniflare.
-4. **Browser render verified.** Committed `scripts/browser-check.js`
-   (`npm run test:browser`, needs a prior build and Chromium/Chrome on PATH). Against
-   the fixture Worker, headless Chromium at 390×844 and 1440×1000 renders the RTL
-   Hebrew page, article rows, four source cards, category options, and the
-   original-title label. Screenshot inspection confirmed correct RTL layout at both
-   widths. Interactive QA (keyboard traversal, filter/order/pagination interactions,
-   error states) is still pending.
-5. **Headline guards tightened.** `acceptRewrite` now also rejects question marks
-   (rhetorical questions) and sensational terms the source did not contain
-   (e.g. בהלם / מזעזע / לא תאמינו), so a rewrite cannot add drama the publisher did
-   not use. The rewrite fingerprint was bumped to `editorial-v2`. Unit coverage: 21
-   tests pass.
+0. **Branding correction.** Removed the `POSITIVITY BIAS` span from
+   `public/index.html` and the now-unused `.brand-caption` rules and reserved
+   spacing from `public/style.css` (desktop + mobile). The editorial prompt no
+   longer names the English brand. Hebrew slogans and deployment identities kept.
+1. **Full-text grounding.** `src/extract.js` extracts the article body with one
+   bounded `HTMLRewriter` pass, skipping navigation/advertising/related/footer and
+   reading JSON-LD metadata plus `articleBody`. Context completeness is tracked as
+   `complete`/`truncated`/`missing`; missing context keeps the original. Full text
+   is fetched transiently only for rewrite candidates and is never persisted or
+   exposed. `scripts/extraction-check.js` verifies this under workerd.
+2. **Editorial + verification prompts.** The rewrite prompt now requires the primary
+   point and its material context (actor/speaker, action, geographic scope, result)
+   and forbids outcome reversal. `@cf/cloudflare/clef-flash` answers two separate
+   questions — supported and context-preserved — and a candidate is accepted only
+   when both are true. Qwen3 is on the cheap allowlist with thinking disabled and a
+   chat-style response parser; default remains Llama until live checks.
+3. **Policy fingerprint + retirement.** `src/policy.js` fingerprints model,
+   grounding policy, editorial version and validator version. Stale rewrites are
+   retired at read/serve time and by a persisted idempotent migration: the generated
+   headline is cleared, the original returns, article identity/source facts stay.
+   `scripts/retirement-check.js` seeds a stale wrong headline and confirms it is not
+   served even with no inference available.
+4. **Adaptive daily budget.** `src/budget.js` replaces the 8/hour and 1024-token
+   caps with token-budgeted batches sized from full-text input, model context and a
+   persisted reservation against `DAILY_NEURON_BUDGET` (default 6000 of the shared
+   10,000/day), reconciled with provider usage and deferred instead of overspending.
+   `MAX_CONTEXT_FETCHES` (20) keeps page fetches inside subrequest limits.
+5. **Regressions.** Exact reported success→failure reversal (heuristic + Clef
+   rejection), the Karmiel/Dimona material-context case (omitted speakers fail;
+   faithful rewrite accepted), cross-article independence, and stale-cache
+   retirement are all covered.
 
-Validation at handoff plus this iteration: `npm run check`, all 21 unit tests,
-`npm run build` (dry run), `npm run test:worker`, and `npm run test:browser` pass.
+Validation this iteration: `npm run check`, **38 unit tests**, `npm run build`,
+`npm run test:worker`, `npm run test:extract`, `npm run test:retirement` all pass.
 
 ## Blocked / needs input
 
 1. **Cloudflare deployment unverified.** No Cloudflare credentials or account access
-   in this environment; the existing Worker name, build/deploy commands, routes, and
-   deployed URL could not be inspected. Reconcile `wrangler.jsonc` (`positivity-bias`)
-   with the connected Workers Builds Worker once access is available. Do not create a
-   parallel deployment.
-3. **Deployed `/api/status` and `/api/news` smoke checks pending** the verified URL.
-   Workers AI Hebrew quality, the native `AI` binding, JSON response shape, and real
-   neuron use are unverified (no deployment). Offline probe: Miniflare's local `AI`
-   binding reports `provider_unavailable` and the refresh still completes with
-   originals preserved, confirming the fallback path. Keep the 8-attempt/hour,
-   1024-token, cheap-model-allowlist limits; prefer honest originals on failure.
-5. Factual-headline validation can still be strengthened with observed rewrite errors
-   once live inference is reachable (names/quotes/causal claims are not yet guarded).
+   in this environment; the existing Worker name, build/deploy commands, routes and
+   deployed URL could not be inspected. Reconcile `wrangler.jsonc`
+   (`positivity-bias`) with the connected Workers Builds Worker once access is
+   available. Do not create a parallel deployment.
+2. **Live inference unverified.** Workers AI Hebrew quality, the `AI` binding,
+   Clef Flash behaviour and real neuron use remain unmeasured. Mocks/fixtures prove
+   wiring and fallbacks only. Switch the default to Qwen3 only after measured live
+   checks. Do not interpret a passing fixture as successful production inference.
+3. **Interactive QA pending** (keyboard traversal, filters, order, pagination,
+   error states). Render checks at 390×844 and 1440×1000 passed previously.
+4. Kan JSON-LD has no `articleSection`, so Kan categories remain missing by policy.
 
 Steering goes through `PROMPT.md`; further implementation belongs to Shurik.
