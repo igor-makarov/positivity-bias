@@ -371,11 +371,13 @@ iteration 2-14 added the current-fingerprint generated-headline rejection serve-
 regression and the clef-decision-invariant unit/pipeline regressions, each shown to
 fail against the pre-fix code and pass after it.
 
-Live re-check (iteration 2-15): live Kan defense/politic/global article pages now
-extract `complete` bodies (1,680–2,364 chars) instead of a 42-char navigation shell,
-including the exact reported drone-test article; live ynet (4,262/2,213) and mako
-(1,872) extraction is unchanged. Kan still exposes no `articleSection`, so its
-categories remain missing by policy.
+Live re-check (iteration 2-15): a 20-article live sample across ynet (news/sport/
+/economy), mako (culture) and Kan (politic/global/local) measured: ynet 12/12 `complete`
+(854–5,202 chars), Kan 4/4 `complete` (1,960–2,364 chars, was a 42-char shell),
+including the exact reported drone-test article, and mako 4/4 `missing` because the
+publisher served a Radware bot challenge (544 chars, correctly refused — the pipeline
+does not follow challenges). Kan still exposes no `articleSection`, so its categories
+remain missing by policy.
 
 ## Blocked / needs input
 
