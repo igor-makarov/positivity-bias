@@ -1,11 +1,12 @@
 [
   {
     "id": "1-1",
-    "outcome": "running",
+    "outcome": "timeout",
     "runId": "38403235636",
     "minEntryId": 7,
-    "maxEntryId": 389,
+    "maxEntryId": 408,
     "checkpointAt": "2026-10-13T13:23:18.146Z",
-    "transcript": "checkpoint"
+    "error": "\"\"",
+    "transcript": "complete"
   }
 ]
