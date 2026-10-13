@@ -44,10 +44,27 @@ try {
   assert.equal(filtered.articles.length, 1); assert.equal(filtered.articles[0].sourceId, 'kan');
   const unmatched = await (await mf.dispatchFetch('https://fixture.local/api/news?q=nomatch')).json();
   assert.equal(unmatched.total, 0);
+  const byCategory = await (await mf.dispatchFetch(`https://fixture.local/api/news?category=${encodeURIComponent('קהילה')}&limit=120`)).json();
+  assert.ok(byCategory.articles.length > 0);
+  assert.ok(byCategory.articles.every((article) => article.categories.includes('קהילה')));
+  const latest = await (await mf.dispatchFetch('https://fixture.local/api/news?order=latest&limit=120')).json();
+  const times = latest.articles.map((article) => article.publishedAt);
+  assert.deepEqual(times, [...times].sort((a, b) => b.localeCompare(a))); // chronological order is exact
+  const firstPage = await (await mf.dispatchFetch('https://fixture.local/api/news?limit=5')).json();
+  const secondPage = await (await mf.dispatchFetch('https://fixture.local/api/news?limit=5&offset=5')).json();
+  assert.equal(firstPage.articles.length, 5);
+  assert.equal(firstPage.total, secondPage.total);
+  assert.ok(firstPage.total > 5);
+  const firstIds = new Set(firstPage.articles.map((article) => article.id));
+  assert.ok(secondPage.articles.every((article) => !firstIds.has(article.id)), 'pagination pages overlap');
+  const status = await (await mf.dispatchFetch('https://fixture.local/api/status')).json();
+  assert.equal(status.stale, false);
+  assert.equal(status.sources.length, 4);
+  assert.ok(!('articles' in status) && !('categories' in status)); // status stays summary-only
   const page = await mf.dispatchFetch('https://fixture.local/');
   assert.equal(page.status, 200); assert.match(await page.text(), /dir="rtl"/);
   assert.equal((await mf.dispatchFetch('https://fixture.local/style.css')).status, 200);
   assert.equal((await mf.dispatchFetch('https://fixture.local/api/refresh', { method: 'POST' })).status, 405);
   assert.equal((await mf.dispatchFetch('https://fixture.local/api/unknown')).status, 404);
-  console.log(`Worker runtime passed: SQLite persistence, all four adapters, HTMLRewriter metadata, original fallback without an AI binding, categories, API filters, cooldown, and static assets (${fixture.count()} publisher requests).`);
+  console.log(`Worker runtime passed: SQLite persistence, all four adapters, HTMLRewriter metadata, original fallback without an AI binding, categories, API filters/order/pagination/status, cooldown, and static assets (${fixture.count()} publisher requests).`);
 } finally { await mf.dispose(); }
