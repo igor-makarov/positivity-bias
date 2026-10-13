@@ -70,9 +70,16 @@ export async function readArticleData(html) {
         // and would abort the whole extraction, so treat those as having no subtree.
         try {
           element.onEndTag(() => {
-            if (frames[frames.length - 1] === frame) frames.pop();
-            else { const at = frames.lastIndexOf(frame); if (at >= 0) frames.splice(at, 1); }
-            if (frame.noise) skipDepth--;
+            const at = frames.lastIndexOf(frame);
+            if (at < 0) return;
+            // Close this element AND any still-open descendants. The parser does not
+            // fire onEndTag for elements whose optional end tag the publisher omitted
+            // (e.g. <li>, or a stray <div class="ad">), so those frames would otherwise
+            // stay on the stack, keep their skip depth active and silently drop the rest
+            // of the article. Frames above an element are always its descendants because
+            // HTML parsing normalizes nesting, so removing them here is safe; their own
+            // end-tag callbacks then find no frame and become no-ops (no double count).
+            for (const removed of frames.splice(at)) if (removed.noise) skipDepth--;
             if (frame.reset) skipDepth = frame.savedSkip;
           });
         } catch { return; }
