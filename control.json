@@ -7,7 +7,7 @@
   "supervisor": "a637cd4b71137ca58960dda0bbb0dd487064810d",
   "status": "running",
   "generation": 1,
-  "next": 1,
+  "next": 2,
   "engine": {
     "repository": "igor-makarov/shurik",
     "ref": "v1"
@@ -17,16 +17,11 @@
   "prompt": "PROMPT.md",
   "checkpointSeconds": 60,
   "checkpointPaths": [],
-  "owner": {
-    "runId": "38403235636",
-    "generation": 1,
-    "iteration": 1,
-    "claimedAt": "2026-10-13T13:13:41.188Z"
-  },
+  "owner": null,
   "deadline": null,
   "seconds": 600,
   "waitSeconds": 3600,
-  "nextRunAt": null,
+  "nextRunAt": "2026-10-13T14:23:58.923Z",
   "provider": "opencode-go",
   "model": "deepseek-v4.1-flash",
   "reasoning": "high",
@@ -34,7 +29,7 @@
   "source": "9376c22f0d7d956b36eb4f617db8dcd259ad703f",
   "sourceRef": null,
   "createdAt": "2026-10-13T13:13:19.552Z",
-  "lastDispatchAt": "2026-10-13T13:13:21.421Z",
+  "lastDispatchAt": null,
   "checkpoint": {
     "workCommit": "8a87e82994d68e06451a5590463d68f33e0f2547",
     "generation": 1,
@@ -49,5 +44,6 @@
       "generation": 1,
       "iteration": 1
     }
-  ]
+  ],
+  "lastRunId": "38403235636"
 }
