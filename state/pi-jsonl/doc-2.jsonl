@@ -1,1 +1,1 @@
-{"format":1,"type":"record","seq":49671,"ordinal":0,"payload":{"type":"document","id":2,"content":{"version":1,"kind":"base","value":{}}}}
+{"format":1,"type":"record","seq":54374,"ordinal":0,"payload":{"type":"document","id":2,"content":{"version":1,"kind":"base","value":{"run":{"taskId":5242,"inputs":[4992]},"tools":[{"callId":"chatcmpl-tool-9a4c39285c233189","name":"bash","taskId":5244,"status":"done","entry":5245}]}}}}
