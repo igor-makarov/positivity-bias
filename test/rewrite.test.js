@@ -81,6 +81,24 @@ test('Verification rejects a merely plausible but incomplete or uncertain candid
   }
 });
 
+test('Cross-article independence: one rejected candidate does not affect a valid sibling', async () => {
+  const candidates = [
+    { ...base, id: 'good', headline: 'לפי המשטרה, 3 בני אדם נפצעו באירוע' },
+    { ...drone, id: 'bad', headline: reversed }
+  ];
+  const env = { AI: { run: async (model, input) => {
+    const sent = JSON.parse(input.messages[1].content);
+    assert.deepEqual(sent.map((item) => item.id), ['good', 'bad']); // clear, stable per-article boundaries
+    return { response: JSON.stringify({ items: [
+      { id: 'good', supported: true, preserved: true },
+      { id: 'bad', supported: false, preserved: false }
+    ] }) };
+  } } };
+  const { accepted, status } = await verifyBatch(candidates, env);
+  assert.deepEqual([...accepted.keys()], ['good']);
+  assert.equal(status, 'partial');
+});
+
 test('No AI binding means original fallback', async () => {
   assert.equal((await rewriteBatch([base], {})).status, 'not_configured');
   assert.equal((await verifyBatch([base], {})).status, 'not_configured');

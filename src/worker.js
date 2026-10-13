@@ -136,6 +136,7 @@ export class NewsStore {
       .slice(0, maxContextFetches(this.env));
     if (!pending.length) { snapshot.rewriteStatus = 'ok'; return; }
     const batches = planBatches(pending.map((article) => ({ article, contextLength: chars })), { model });
+    if (!batches.length) { snapshot.rewriteStatus = 'context_unavailable'; return; }
     const day = this.usageDay(now);
     let accepted = 0, deferred = false, providerFailed = false, contextUnavailable = false;
     for (const batch of batches) {
@@ -172,7 +173,7 @@ export class NewsStore {
         if (article) { article.headline = headline; article.rewriteStatus = 'rewritten'; article.rewriteFingerprint = fingerprint; }
         accepted++;
       }
-      if (verified.status === 'provider_unavailable') { providerFailed = true; break; }
+      if (verified.status === 'provider_unavailable') { snapshot.rewriteStatus = 'provider_unavailable'; providerFailed = true; break; }
     }
     snapshot.rewriteStatus = providerFailed ? snapshot.rewriteStatus
       : accepted ? 'ok' : deferred ? 'budget_deferred' : contextUnavailable ? 'context_unavailable' : 'ok';
