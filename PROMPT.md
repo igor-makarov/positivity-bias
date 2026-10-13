@@ -40,20 +40,27 @@ The user supplied a second screenshot, generated with a 3B model. Its source tit
 "האוכלוסייה בישראל רואה את הצפון כצימר לסופ״ש אבל לא כמקום לגור בו"
 became:
 "ראשי ערים קראו לשינוי דמוגרפי בישראל"
-Relative to the supplied headline, the rewrite loses the central north/tourism
-versus permanent-residence contrast and introduces a demographic-policy framing
-that is not supported by that headline. Do not infer that the full article says
-anything beyond the available evidence; use its accessible body to identify the
-actual speakers, claim, scope and attribution. Add this exact case as a second
-regression, alongside the successful-drone-test reversal.
+The user clarified that the original headline was also poor and that a better
+headline must identify the speakers as **mayors in the north** ("ראשי ערים בצפון")
+at minimum. Treat the actor AND northern geographical scope as essential facts in
+this regression. Preserve the actual tourism-versus-permanent-residence point and
+its attribution; do not turn it into an abstract national demographic-policy claim.
+A candidate direction, conditional on the article supporting the quoted claim:
+"ראשי ערים בצפון: הציבור רואה באזור יעד לנופש ולא למגורים".
+Ground the final wording in the accessible article body and the user's confirmed
+speaker context; do not invent a policy demand or other facts. Add this exact case
+as a second regression, alongside the successful-drone-test reversal.
 
 Both the runtime grounding/editorial prompt AND Clef Flash verification must
 prioritize information preservation, not only factual non-contradiction:
 - Identify the article's primary event/claim and what makes it newsworthy.
 - Preserve the actor/speaker, actual action or claim, geographical/population scope,
   result, and any essential qualifier, eligibility condition, comparison or contrast.
-- Keep the original news angle when it is supported by the article; do not replace
-  a specific north/residence problem with an abstract national demographic claim.
+- Find the real central point in the article, including speakers and location,
+  even when the publisher headline is vague or poor. Original-title fidelity is
+  not a substitute for article-grounded information selection. In this example,
+  omission of "ראשי ערים בצפון" must fail material-context verification, as must
+  replacing the north/residence issue with an abstract national demographic claim.
 - Distinguish an attributed opinion or quoted perception from an established fact.
   Removing quote marks does not authorize presenting the quotation as fact.
 - Remove sensational tone without erasing the core point. Prioritize these material
