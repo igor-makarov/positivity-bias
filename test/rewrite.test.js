@@ -246,10 +246,27 @@ test('An ambiguous clef answer is distinguished from a definitive rejection', as
     '0_supported': { type: 'noul', noul: 0 }, '0_preserved': { type: 'noul', noul: 1 }, // definitive no
     '1_supported': { type: 'noul', noul: 1 } // no preserved answer: ambiguous, no decision
   } }) } };
-  const { accepted, rejected } = await verifyBatch(candidates, env);
+  const { accepted, rejected, evaluated } = await verifyBatch(candidates, env);
   assert.equal(accepted.size, 0);
   assert.deepEqual([...rejected], ['definite']);
   assert.ok(!rejected.has('ambiguous'));
+  assert.deepEqual([...evaluated], ['definite']); // the ambiguous candidate was never decided
+});
+
+// A clef response that answers none of the candidates decides nothing. It must be
+// reported as undecided (empty `evaluated`) instead of looking like a definitive
+// rejection, so the caller can surface a failed verification and keep/retry originals.
+test('A clef response that answers no candidate is reported as undecided, not a rejection', async () => {
+  const candidates = [
+    { ...base, id: 'undecided-a', headline: 'לפי המשטרה, 3 בני אדם נפצעו באירוע' },
+    { ...drone, id: 'undecided-b', headline: reversed }
+  ];
+  const env = { AI: { run: async () => ({ model: 'clef-flash', answers: {} }) } };
+  const { accepted, rejected, evaluated, status } = await verifyBatch(candidates, env);
+  assert.equal(accepted.size, 0);
+  assert.equal(rejected.size, 0);
+  assert.equal(evaluated.size, 0); // nothing was decided
+  assert.equal(status, 'rejected'); // no candidate was accepted; the caller flags the empty decision set
 });
 test('Expensive models are blocked before inference; Qwen3 is an allowed cheap model', async () => {
   const AI = { run: () => { throw new Error('Must not run'); } };

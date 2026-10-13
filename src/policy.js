@@ -23,28 +23,34 @@ export const CHEAP_MODELS = new Set([
 ]);
 
 // Documented context windows (tokens), used to split requests without ever
-// truncating an article merely to fit more articles into a batch.
+// truncating an article merely to fit more articles into a batch. Pinned to the live
+// Cloudflare model pages (2026-10-13): clef-flash 24,576, clef 65,536,
+// llama-3.2-1b 60,000, llama-3.2-3b 80,000, qwen3-30b-a3b 32,768.
 export const MODEL_CONTEXT_TOKENS = {
   [DEFAULT_REWRITE_MODEL]: 128_000,
   '@cf/qwen/qwen3-30b-a3b-fp8': 32_768,
-  '@cf/meta/llama-3.2-1b-instruct': 128_000,
-  '@cf/meta/llama-3.2-3b-instruct': 128_000,
-  // clef-flash is a decision model with a documented 24,576-token window.
+  '@cf/meta/llama-3.2-1b-instruct': 60_000,
+  '@cf/meta/llama-3.2-3b-instruct': 80_000,
+  // clef-flash is a decision model with a documented 24,576-token window; the larger,
+  // pricier clef has a documented 65,536-token window. Keeping them separate stops an
+  // oversized request from being planned for the flash model.
   [DEFAULT_VALIDATOR_MODEL]: 24_576,
-  '@cf/cloudflare/clef': 24_576,
+  '@cf/cloudflare/clef': 65_536,
 };
 
-// Estimated neurons per token, derived from Cloudflare's published per-million-token
-// prices and the $0.011 / 1,000-neuron rate. These are planning estimates only; the
-// ledger is reconciled with provider-reported usage when available.
+// Estimated neurons per token, taken from Cloudflare's published "neurons per M
+// tokens" (2026-10-13), which is the unit the Free account is billed in. These are
+// planning estimates only; the ledger is reconciled with provider-reported usage.
 export const MODEL_NEURON_RATES = {
-  [DEFAULT_REWRITE_MODEL]: { in: 0.00409, out: 0.03491 },
-  '@cf/qwen/qwen3-30b-a3b-fp8': { in: 0.00464, out: 0.03045 },
-  '@cf/meta/llama-3.2-1b-instruct': { in: 0.00500, out: 0.03000 },
-  '@cf/meta/llama-3.2-3b-instruct': { in: 0.00600, out: 0.03300 },
-  // $0.038 per M input tokens and no output-token charge (0.038 / 11 = 0.0034545).
-  [DEFAULT_VALIDATOR_MODEL]: { in: 0.0034545, out: 0 },
-  '@cf/cloudflare/clef': { in: 0.0034545, out: 0 },
+  [DEFAULT_REWRITE_MODEL]: { in: 4119 / 1_000_000, out: 34868 / 1_000_000 },
+  '@cf/qwen/qwen3-30b-a3b-fp8': { in: 4625 / 1_000_000, out: 30475 / 1_000_000 },
+  '@cf/meta/llama-3.2-1b-instruct': { in: 2457 / 1_000_000, out: 18252 / 1_000_000 },
+  '@cf/meta/llama-3.2-3b-instruct': { in: 4625 / 1_000_000, out: 30475 / 1_000_000 },
+  // 3,455 neurons per M input tokens and no output-token charge.
+  [DEFAULT_VALIDATOR_MODEL]: { in: 3455 / 1_000_000, out: 0 },
+  // 21,818 neurons per M input tokens, no output-token charge. This is ~6.3x the
+  // flash rate, so it must never be under-reserved if it is ever configured.
+  '@cf/cloudflare/clef': { in: 21818 / 1_000_000, out: 0 },
 };
 
 export function modelNeuronRate(model) {

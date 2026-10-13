@@ -5,11 +5,14 @@ import worker, { NewsStore } from '../src/worker.js';
 
 const validatorDefault = '@cf/cloudflare/clef-flash';
 
-function createMockAI(validatorModel, rewriteMode) {
+function createMockAI(validatorModel, rewriteMode, validatorMode) {
   const calls = { rewrite: 0, verify: 0 };
   const run = async (model, input) => {
     if (model === validatorModel) {
       calls.verify++;
+      // A validator that answers none of the questions is a failed verification, not a
+      // healthy refresh: the rewrite must be surfaced as invalid, not reported as `ok`.
+      if (validatorMode === 'empty') return { model: 'clef-flash', answers: {}, usage: { input_tokens: 1000, output_tokens: 0 } };
       // clef answers are `noul` probabilities keyed by the candidate index.
       const answers = {};
       input.state.forEach((item, index) => {
@@ -41,7 +44,7 @@ export class PipelineStore extends NewsStore {
     const url = new URL(request.url);
     if (url.pathname === '/run' && request.method === 'POST') {
       const body = await request.json();
-      const mock = createMockAI(body.env?.VALIDATOR_MODEL || validatorDefault, body.env?.MOCK_REWRITE);
+      const mock = createMockAI(body.env?.VALIDATOR_MODEL || validatorDefault, body.env?.MOCK_REWRITE, body.env?.MOCK_VALIDATOR);
       this.env = { ...this.env, ...(body.env || {}), AI: mock };
       if (body.snapshot) this.writeSnapshot(body.snapshot);
       const result = await this.refresh();

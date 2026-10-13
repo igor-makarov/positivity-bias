@@ -251,8 +251,8 @@ export async function rewriteBatch(items, env, { model = env.REWRITE_MODEL || DE
 // headline. One bounded clef call per chunk (capped by the documented question and
 // context limits), no retries.
 export async function verifyBatch(candidates, env, { model = env.VALIDATOR_MODEL || DEFAULT_VALIDATOR_MODEL } = {}) {
-  if (!env.AI || !candidates.length) return { accepted: new Map(), rejected: new Set(), status: 'not_configured', usage: null };
-  if (!isClefModel(model)) return { accepted: new Map(), rejected: new Set(), status: 'validator_misconfigured', usage: null };
+  if (!env.AI || !candidates.length) return { accepted: new Map(), rejected: new Set(), evaluated: new Set(), status: 'not_configured', usage: null };
+  if (!isClefModel(model)) return { accepted: new Map(), rejected: new Set(), evaluated: new Set(), status: 'validator_misconfigured', usage: null };
   const accepted = new Map();
   // Candidates for which clef returned a definitive no. A candidate whose answer is
   // missing/ambiguous is in neither map/set: it keeps the original and is retried.
@@ -273,7 +273,11 @@ export async function verifyBatch(candidates, env, { model = env.VALIDATOR_MODEL
       else rejected.add(candidate.id);
     });
   }
-  if (failed) return { accepted, rejected, status: 'provider_unavailable', usage };
+  // `evaluated` is the set of candidates clef actually decided (a definite yes or no).
+  // A candidate whose answer is missing/ambiguous is not here, so the caller can tell a
+  // validator that decided nothing apart from one that legitimately rejected everything.
+  const evaluated = new Set([...accepted.keys(), ...rejected]);
+  if (failed) return { accepted, rejected, evaluated, status: 'provider_unavailable', usage };
   const status = accepted.size === candidates.length ? 'ok' : accepted.size ? 'partial' : 'rejected';
-  return { accepted, rejected, status, usage };
+  return { accepted, rejected, evaluated, status, usage };
 }

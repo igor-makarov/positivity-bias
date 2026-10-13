@@ -7,6 +7,31 @@
 - Sessions/control are on `shurik-control/main`; iterations continue immediately
   (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
+## Verified (2026-10-13, iteration 2-14)
+
+30. **A clef response that decided NONE of the candidates was reported as a healthy
+    `ok`.** `verifyBatch` computed its batch `status` only from `accepted.size`, so a
+    validator that returned no usable `noul` answer for any candidate (e.g. an empty
+    `answers` object after a schema/provider drift) still looked like a definitive
+    rejection, and `rewritePending` then reported the whole refresh as `ok` with zero
+    rewrites — the same honesty defect fixed for the rewrite model in 2-12. `verifyBatch`
+    now returns an `evaluated` set of the candidates it actually decided (a definite yes
+    or no), and the worker flags `invalid_response` when candidates were submitted but
+    the validator decided none of them. Ambiguous answers keep the preserved original and
+    are retried (not cached); a legitimate rejection of every candidate is unchanged.
+    New unit regression (the pre-fix code had no `evaluated` and looked like a rejection)
+    and a `npm run test:pipeline` `MOCK_VALIDATOR: empty` case (shown to fail pre-fix with
+    `ok` and pass with `invalid_response`, originals preserved and retried).
+31. **The model table under-stated the non-flash clef cost ~6.3x and had two wrong
+    Llama windows.** Re-checked every entry against the live Cloudflare model pages and
+    pricing (2026-10-13): `@cf/cloudflare/clef` is 65,536 tokens and 21,818 neurons/M
+    input (not 24,576 / 3,455), `llama-3.2-1b` is 60,000 tokens (not 128,000) and
+    `llama-3.2-3b` is 80,000 (not 128,000). All rates are now the published per-million
+    neuron counts (llama-3.1-8b-fp8-fast 4119/34868, qwen3 4625/30475, clef-flash 3455
+    input-only, clef 21818 input-only), so an allowed validator can no longer be
+    under-reserved against the shared 10,000-neuron/day allowance. A new unit test pins
+    every window and rate and asserts the non-flash clef is never cheaper than flash.
+
 ## Verified (2026-10-13, iteration 2-13)
 
 28. **A cached rejection could be served as a generated headline labelled "original".**
@@ -314,15 +339,17 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Latest full validation (iteration 2-13): `npm run check`, **60 unit tests**,
+Latest full validation (iteration 2-14): `npm run check`, **62 unit tests**,
 `npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`
 (adds the current-fingerprint generated-headline rejection serve-time regression),
 `npm run test:pipeline` (mock model end-to-end, retire/reprocess, honest
-invalid-response status and the model-omission retry), `npm run test:batch`
-(validator-window splitting, budget-aware reduction and the documented clef decision
-schema), `npm run test:browser` and `npm run test:interaction` all pass. The new
-rejection-invariant unit and retirement regressions were shown to fail against the
-pre-fix trust condition (a generated headline served as `original`) and pass after it.
+invalid-response status, the model-omission retry and the failed-verification case),
+`npm run test:batch` (validator-window splitting, budget-aware reduction and the
+documented clef decision schema), `npm run test:browser` and `npm run test:interaction`
+all pass. The new clef-decision-invariant unit and pipeline regressions were shown to
+fail against the pre-fix code (an undecided verification reported as `ok`) and pass
+after it; the model-table unit test was shown to fail against the stale windows/rates
+and pass after the correction.
 
 Live re-check (iteration 2-9): four live ynet article pages and two live mako article
 pages extracted `complete` bodies (1,872–7,620 chars, one truncated at the 6,000-char
@@ -343,6 +370,15 @@ ingested 126 articles across ynet/kan/n12/mako, all `ok`, with real full-text co
    fixture as successful production inference. Real-article extraction was re-exercised
    against live pages in iteration 2-9; mako/N12 now served extractable pages, kan
    remains a client-rendered shell.
+   Iteration 2-14 found the default rewrite model's docs page gone: requesting
+   `.../workers-ai/models/llama-3.1-8b-instruct-fp8-fast/` now redirects to
+   `/workers-ai/models/?unavailable=llama-3.1-8b-instruct-fp8-fast` ("deprecated,
+   removed, or not found") and the slug is absent from the 70-model catalog, though the
+   pricing page (Oct 9, 2026) still lists it. The catalog still lists
+   `@cf/qwen/qwen3-30b-a3b-fp8` and the cheap `llama-3.1-8b-instruct-fp8` /
+   `llama-3.2-*` models. This needs a live account to confirm whether the configured
+   default still serves inference; the pipeline safely preserves originals if it does
+   not. Do not switch the default on docs evidence alone.
    Iteration 2-9 fixed the clef-flash integration: the verifier now uses the documented
    decision schema (`state` + typed `noul` questions → `answers[*].noul`) instead of a
    chat envelope, and the 24,576-token window / input-only pricing are used. A live

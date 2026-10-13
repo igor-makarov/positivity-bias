@@ -154,5 +154,25 @@ try {
   const emptyServed = await (await emptyStore.fetch('https://news.internal/snapshot')).json();
   assert.ok(emptyServed.articles.length > 0);
   assert.ok(emptyServed.articles.every((article) => article.headline === article.originalHeadline && article.rewriteStatus === 'original'));
-  console.log('Pipeline passed: full-text context, bounded rewrite+verify, independent acceptance/rejection, usage ledger, budget deferral, model-omission retry, honest empty-response status, and stale-rewrite retirement with reprocessing.');
+
+  // A validator that answers NONE of the submitted candidates is a failed verification,
+  // not a healthy `ok`: the refresh must say so, keep the preserved originals and retry
+  // later instead of caching them as if clef had rejected them.
+  const badValidatorStore = namespace.get(namespace.idFromName('bad-validator'));
+  const badValidatorEnv = { REWRITE_MODEL: '@cf/meta/llama-3.1-8b-instruct-fp8-fast', VALIDATOR_MODEL: '@cf/cloudflare/clef-flash',
+    DAILY_NEURON_BUDGET: '6000', CONTEXT_CHARS: '6000', MAX_CONTEXT_FETCHES: '4', MOCK_VALIDATOR: 'empty' };
+  const badValidatorSeed = { articles: [], updatedAt: null, lastAttemptAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+    policyFingerprint: null, rewriteStatus: 'not_configured', sources: [] };
+  const badValidator = await (await badValidatorStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: badValidatorSeed, env: badValidatorEnv }) })).json();
+  assert.equal(badValidator.result.state, 'complete');
+  assert.equal(badValidator.result.rewriteStatus, 'invalid_response');
+  assert.ok(badValidator.calls.rewrite > 0);
+  assert.ok(badValidator.calls.verify > 0); // the verification was attempted, it just decided nothing
+  const badServed = await (await badValidatorStore.fetch('https://news.internal/snapshot')).json();
+  assert.ok(badServed.articles.length > 0);
+  assert.ok(badServed.articles.every((article) => article.headline === article.originalHeadline && article.rewriteStatus === 'original'));
+  const badRetriedSeed = { ...badServed, lastAttemptAt: new Date(Date.now() - 2 * 3_600_000).toISOString() };
+  const badRetried = await (await badValidatorStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: badRetriedSeed, env: badValidatorEnv }) })).json();
+  assert.ok(badRetried.calls.rewrite > 0, 'an undecided verification must be retried, not cached');
+  console.log('Pipeline passed: full-text context, bounded rewrite+verify, independent acceptance/rejection, usage ledger, budget deferral, model-omission retry, honest empty-response status, failed-verification status, and stale-rewrite retirement with reprocessing.');
 } finally { await mf.dispose().catch(() => {}); await rm(directory, { recursive: true, force: true }).catch(() => {}); }

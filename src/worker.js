@@ -187,9 +187,14 @@ export class NewsStore {
       let spent = rewrite.usage ?? null;
       const verified = rewrite.candidates.length
         ? await verifyBatch(rewrite.candidates, this.env, { model: validator })
-        : { accepted: new Map(), rejected: new Set(), usage: null, status: 'rejected' };
+        : { accepted: new Map(), rejected: new Set(), evaluated: new Set(), usage: null, status: 'rejected' };
       if (verified.usage != null) spent = (spent ?? 0) + verified.usage;
       this.reconcileUsage(day, estimate, spent ?? estimate);
+      // A clef response that decided NONE of the submitted candidates is a failed
+      // verification, not a healthy refresh: report it honestly (and keep originals)
+      // instead of a misleading `ok` that would hide a non-functioning validator. A
+      // partial answer or a legitimate rejection of every candidate is not affected.
+      if (rewrite.candidates.length && (verified.evaluated?.size ?? 0) === 0) invalidResponse = true;
       for (const [id, headline] of verified.accepted) {
         const article = snapshot.articles.find((entry) => entry.id === id);
         if (article) { article.headline = headline; article.rewriteStatus = 'rewritten'; article.rewriteFingerprint = fingerprint; }
