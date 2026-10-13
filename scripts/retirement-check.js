@@ -6,7 +6,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { DEFAULT_REWRITE_MODEL } from '../src/policy.js';
+import { DEFAULT_REWRITE_MODEL, policyFingerprint } from '../src/policy.js';
 
 const directory = await mkdtemp(join(process.cwd(), '.probe-'));
 const outfile = join(directory, 'probe.js');
@@ -67,5 +67,27 @@ try {
   for (const entry of again.articles) assert.equal(entry.headline, entry.originalHeadline);
   assert.ok(again.policyFingerprint);
   assert.notEqual(again.policyFingerprint, legacyFingerprint);
+
+  // Serve-time enforcement is article-level, not flag-level: even when the snapshot
+  // already carries the ACTIVE policy fingerprint, a stale/headless cached headline is
+  // retired on read, while a genuinely current rewrite is kept.
+  const active = policyFingerprint({});
+  const staleArticle = { id: 'stale-3', url: 'https://www.ynet.co.il/news/article/3', sourceId: 'ynet', sourceName: 'ynet',
+    originalHeadline: 'המועצה אישרה 5 תוכניות', headline: 'המועצה דחתה 5 תוכניות', rewriteStatus: 'rewritten',
+    rewriteFingerprint: 'old-policy', categories: ['חדשות'], publishedAt: now, description: 'תיאור' };
+  const headlessArticle = { id: 'headless-4', url: 'https://www.ynet.co.il/news/article/4', sourceId: 'ynet', sourceName: 'ynet',
+    originalHeadline: 'הצעת החוק אושרה בקריאה ראשונה', categories: ['חדשות'], publishedAt: now, description: 'תיאור' };
+  const trusted = { id: 'trusted-5', url: 'https://www.ynet.co.il/news/article/5', sourceId: 'ynet', sourceName: 'ynet',
+    originalHeadline: 'העירייה תפתח 2 גנים חדשים', headline: 'העירייה תפתח 2 גנים חדשים בשכונה', rewriteStatus: 'rewritten',
+    rewriteFingerprint: active, categories: ['חדשות'], publishedAt: now, description: 'תיאור' };
+  await store.fetch('https://news.internal/seed', { method: 'POST', body: JSON.stringify({ articles: [staleArticle, headlessArticle, trusted],
+    updatedAt: now, lastAttemptAt: now, policyFingerprint: active, rewriteStatus: 'ok', sources: [] }) });
+  const forced = await (await mf.dispatchFetch('https://fixture.local/api/news')).json();
+  const forcedById = new Map(forced.articles.map((entry) => [entry.id, entry]));
+  assert.equal(forcedById.get(staleArticle.id).headline, staleArticle.originalHeadline);
+  assert.equal(forcedById.get(headlessArticle.id).headline, headlessArticle.originalHeadline);
+  assert.equal(forcedById.get(trusted.id).headline, trusted.headline);
+  assert.equal(forcedById.get(trusted.id).rewriteStatus, 'rewritten');
+
   console.log('Retirement passed: a stale cached headline is never served and the migration persists without inference.');
 } finally { await mf.dispose().catch(() => {}); await rm(directory, { recursive: true, force: true }).catch(() => {}); }

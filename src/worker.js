@@ -29,12 +29,15 @@ export class NewsStore {
   }
 
   // Serve-time enforcement: a cached rewrite is displayed only while its fingerprint
-  // matches the active policy. The persisted migration below is idempotent and runs
-  // even before the next refresh, cooldown or quota failure.
+  // matches the active policy. The check runs against the actual article state on every
+  // read (not just when the snapshot-level flag changes), so a stale/generated headline
+  // can never be served even if the flag was already advanced. The persisted migration is
+  // idempotent and runs before the next refresh, cooldown or quota failure.
   applyPolicyRetirement(snapshot) {
     const fingerprint = policyFingerprint(this.env);
-    if (snapshot.policyFingerprint === fingerprint) return snapshot;
+    const staleFlag = snapshot.policyFingerprint !== fingerprint;
     const { articles, changed } = retireStaleRewrites(snapshot.articles || [], fingerprint);
+    if (!changed && !staleFlag) return snapshot;
     snapshot.articles = articles;
     snapshot.policyFingerprint = fingerprint;
     if (changed) snapshot.rewritesRetiredAt = new Date().toISOString();

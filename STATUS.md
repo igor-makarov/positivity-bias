@@ -32,6 +32,15 @@
     preserved original is now retired to the original. New unit and
     `npm run test:retirement` regressions cover a headless article and were shown to
     fail against the pre-fix logic and pass after it.
+18. **Article-level serve-time enforcement.** `applyPolicyRetirement` returned early
+    whenever the snapshot-level `policyFingerprint` already matched, so an inconsistent
+    snapshot (flag advanced while an article still held a stale/headless cached headline)
+    would keep serving it until the next refresh. The check now runs against the actual
+    article state on every read and writes only when something changed; a current-policy
+    accepted rewrite is still kept. `npm run test:retirement` seeds the active fingerprint
+    together with a stale and a headless headline and proves both are retired on read while
+    the trusted rewrite is served; the assertion was shown to fail against the pre-fix
+    early return and pass after it.
 
 ## Verified (2026-10-13, iteration 2-7)
 
