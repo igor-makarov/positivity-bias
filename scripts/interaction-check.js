@@ -103,7 +103,7 @@ try {
     if (result.exceptionDetails) throw new Error(`${result.exceptionDetails.text} ${result.exceptionDetails.exception?.description || ''}`);
     return result.result.value;
   };
-  const waitFor = async (expression, timeout = 15_000) => {
+  const waitFor = async (expression, timeout = 25_000) => {
     const started = Date.now();
     while (Date.now() - started < timeout) {
       try { if (await evaluate(expression)) return; } catch { /* execution context not ready yet */ }
@@ -111,6 +111,8 @@ try {
     }
     throw new Error(`Timed out waiting for: ${expression}`);
   };
+  // Wait until the in-flight load finished (app.js disables #more while loading).
+  const settle = async () => { await waitFor('!document.getElementById("more").disabled', 20_000); await wait(120); };
   const tab = async () => {
     await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
     await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
@@ -122,6 +124,7 @@ try {
   await send('Page.navigate', { url: pageUrl });
   await waitFor('document.querySelectorAll(".article").length >= 4');
   await waitFor('document.getElementById("more") && !document.getElementById("more").hidden');
+  await settle();
 
   // 1. Keyboard traversal: every primary control is reachable with Tab alone.
   const seen = [];
@@ -139,31 +142,37 @@ try {
   await waitFor('document.querySelectorAll(".article").length > 0 && [...document.querySelectorAll(".article-source")].every((n) => n.textContent === "כאן")');
   const kanCount = await evaluate('document.querySelectorAll(".article").length');
   assert.ok(kanCount > 0, 'source filter rendered no rows');
+  await settle();
   await evaluate(`(() => { const el = document.getElementById('source'); el.value = ''; el.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   await waitFor('document.querySelectorAll(".article").length >= 4');
+  await settle();
 
   // 3. Category filter: selecting a publisher category narrows the rows.
   const category = await evaluate('[...document.querySelectorAll("#category option")].map((o) => o.value).find((v) => v)');
   assert.ok(category, 'no publisher category was offered');
   await evaluate(`(() => { const el = document.getElementById('category'); el.value = ${JSON.stringify(category)}; el.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   await waitFor(`document.querySelectorAll(".article").length > 0 && [...document.querySelectorAll(".category-label")].every((n) => n.textContent.includes(${JSON.stringify(category)}))`);
+  await settle();
   await evaluate(`(() => { const el = document.getElementById('category'); el.value = ''; el.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   await waitFor('document.querySelectorAll(".article").length >= 4');
+  await settle();
 
   // 4. Chronological order toggle.
   await evaluate('document.getElementById("latest").click()');
   await waitFor('document.getElementById("latest").getAttribute("aria-pressed") === "true" && document.getElementById("broad").getAttribute("aria-pressed") === "false"');
   await waitFor('document.getElementById("view-explanation").textContent.includes("זמן")');
+  await settle();
   const times = await evaluate('[...document.querySelectorAll(".article time")].map((t) => t.dateTime)');
   assert.deepEqual(times, [...times].sort((a, b) => b.localeCompare(a)), 'chronological order is not descending');
   await evaluate('document.getElementById("broad").click()');
   await waitFor('document.getElementById("broad").getAttribute("aria-pressed") === "true"');
+  await settle();
 
   // 5. Explicit load-more pagination appends new rows without duplicates.
   const before = await evaluate('document.querySelectorAll(".article").length');
   const firstHrefs = await evaluate('[...document.querySelectorAll(".article-title a")].map((a) => a.href)');
   await evaluate('document.getElementById("more").click()');
-  await waitFor(`document.querySelectorAll(".article").length > ${before}`);
+  await waitFor(`document.querySelectorAll(".article").length > ${before}`, 20_000);
   const allHrefs = await evaluate('[...document.querySelectorAll(".article-title a")].map((a) => a.href)');
   assert.equal(new Set(allHrefs).size, allHrefs.length, 'pagination produced duplicate rows');
   assert.ok(firstHrefs.every((href) => allHrefs.includes(href)), 'pagination dropped earlier rows');

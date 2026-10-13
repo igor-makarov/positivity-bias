@@ -19,6 +19,30 @@
    load-more pagination without duplicate rows, and the rendered error/retry state
    when `/api/news` is blocked. Passes locally; README documents the command.
 
+9. **Real-article extraction defects found and fixed.** Ran `readArticleData`/
+   `prepareContext` against live accessible pages (ynet, mako/N12, kan) under workerd.
+   Two concrete defects: (a) `element.onEndTag` threw `Parser error: No end tag.` for
+   self-closing foreign elements (SVG `<path>`), aborting extraction on real pages —
+   every kan article failed; end-tag registration is now guarded so such elements are
+   treated as having no subtree. (b) Bot-mitigation interstitials (Radware: "made us
+   think that you are a bot") and thin client-rendered shells (kan: 42-char nav text)
+   were marked `complete` and would have been fed to the model; `prepareContext` now
+   treats known challenge/denied text and bodies under `MIN_CONTEXT_CHARS` (120) as
+   `missing`, preserving the original. `CONTEXT_POLICY` is bumped to `full-text-v2`, so
+   rewrites grounded on the old extraction are retired by the existing fingerprint path.
+   Measured after the fix: ynet 3075 chars `complete`; mako/N12 block pages and kan
+   shells `missing` (no crash). A further sample of six live ynet articles all expose
+   JSON-LD `articleBody` (1063–7620 chars, one truncated at the 6000 cap); one is the
+   exact second-screenshot article ("האוכלוסייה בישראל רואה את הצפון כצימר לסופ״ש...",
+   2688 chars), so the Karmiel/Dimona grounding context is accessible in production.
+   Regressions: `test:extract` now includes a self-closing SVG and block/thin cases;
+   unit tests cover thin/block handling.
+
+10. **Honest limitation recorded:** kan article pages are client-rendered, so their
+    initial HTML body is only navigation (42 chars) — kan keeps original headlines
+    under the new policy instead of being fed chrome. Its JSON-LD still supplies the
+    headline; categories remain missing (no `articleSection`).
+
 ## Verified (2026-10-13, iteration 2-4)
 
 6. **Shared batch sizing fix.** `planBatches` previously sized requests by the
@@ -75,10 +99,11 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Validation this iteration: `npm run check`, **44 unit tests**, `npm run build`,
-`npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
+Latest full validation (iteration 2-5): `npm run check`, **46 unit tests**,
+`npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
 `npm run test:pipeline` (mock model end-to-end), `npm run test:batch` (validator-window
-splitting) and `npm run test:browser` all pass.
+splitting), `npm run test:browser` and `npm run test:interaction` all pass
+(two consecutive full runs).
 
 ## Blocked / needs input
 
@@ -91,6 +116,9 @@ splitting) and `npm run test:browser` all pass.
    Clef Flash behaviour and real neuron use remain unmeasured. Mocks/fixtures prove
    wiring and fallbacks only. Switch the default to Qwen3 only after measured live
    checks. Do not interpret a passing fixture as successful production inference.
+   Real-article extraction itself has now been exercised against live pages (see
+   iteration 2-5); mako/N12 serve a bot challenge to the project User-Agent, so those
+   articles preserve originals rather than bypassing the challenge.
 3. **Interactive QA.** Keyboard traversal, filter/order/pagination interaction and
    the rendered error/retry state are now covered by `npm run test:interaction`
    (see iteration 2-5). Render checks at 390×844 and 1440×1000 passed previously.
