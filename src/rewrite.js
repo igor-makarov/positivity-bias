@@ -216,8 +216,8 @@ async function runModel(env, model, system, user, maxTokens) {
 // One bounded rewrite call for a batch of independent articles. Returns the accepted
 // heuristic candidates (headline included) for the separate verification call.
 export async function rewriteBatch(items, env, { model = env.REWRITE_MODEL || DEFAULT_REWRITE_MODEL, maxTokens } = {}) {
-  if (!env.AI || !items.length) return { candidates: [], status: 'not_configured', usage: null };
-  if (!CHEAP_MODELS.has(model)) return { candidates: [], status: 'budget_guard', usage: null };
+  if (!env.AI || !items.length) return { candidates: [], evaluated: new Set(), status: 'not_configured', usage: null };
+  if (!CHEAP_MODELS.has(model)) return { candidates: [], evaluated: new Set(), status: 'budget_guard', usage: null };
   const requestItems = items.map((item) => ({
     id: item.id, source: item.sourceName, publishedAt: item.publishedAt,
     originalHeadline: plainText(item.originalHeadline, 300),
@@ -227,17 +227,22 @@ export async function rewriteBatch(items, env, { model = env.REWRITE_MODEL || DE
   const user = JSON.stringify(requestItems);
   let payload, usage;
   try { ({ payload, usage } = await runModel(env, model, EDITORIAL_PROMPT, user, maxTokens ?? OUTPUT_TOKENS_PER_ITEM * items.length + 32)); }
-  catch { return { candidates: [], status: 'provider_unavailable', usage: null }; }
+  catch { return { candidates: [], evaluated: new Set(), status: 'provider_unavailable', usage: null }; }
   const document = parseJsonObject(payload);
-  if (!Array.isArray(document?.items)) return { candidates: [], status: 'invalid_response', usage };
+  if (!Array.isArray(document?.items)) return { candidates: [], evaluated: new Set(), status: 'invalid_response', usage };
   const candidates = [];
+  // `evaluated` tracks the articles the model actually answered for (exactly one item
+  // per stable id). An id absent here is a model omission, not a rejection decision, so
+  // the caller must not cache it as a source-grounded rejection.
+  const evaluated = new Set();
   for (const item of items) {
     const matches = document.items.filter((candidate) => candidate.id === item.id);
     if (matches.length !== 1) continue;
+    evaluated.add(item.id);
     const headline = acceptRewrite(item, matches[0]);
     if (headline) candidates.push({ ...item, headline });
   }
-  return { candidates, status: candidates.length === items.length ? 'ok' : candidates.length ? 'partial' : 'rejected', usage };
+  return { candidates, evaluated, status: candidates.length === items.length ? 'ok' : candidates.length ? 'partial' : 'rejected', usage };
 }
 
 // Verifies candidates with the factual-consistency decision model. A candidate is
@@ -246,9 +251,12 @@ export async function rewriteBatch(items, env, { model = env.REWRITE_MODEL || DE
 // headline. One bounded clef call per chunk (capped by the documented question and
 // context limits), no retries.
 export async function verifyBatch(candidates, env, { model = env.VALIDATOR_MODEL || DEFAULT_VALIDATOR_MODEL } = {}) {
-  if (!env.AI || !candidates.length) return { accepted: new Map(), status: 'not_configured', usage: null };
-  if (!isClefModel(model)) return { accepted: new Map(), status: 'validator_misconfigured', usage: null };
+  if (!env.AI || !candidates.length) return { accepted: new Map(), rejected: new Set(), status: 'not_configured', usage: null };
+  if (!isClefModel(model)) return { accepted: new Map(), rejected: new Set(), status: 'validator_misconfigured', usage: null };
   const accepted = new Map();
+  // Candidates for which clef returned a definitive no. A candidate whose answer is
+  // missing/ambiguous is in neither map/set: it keeps the original and is retried.
+  const rejected = new Set();
   let usage = null, failed = false;
   for (const chunk of planVerificationBatches(candidates, { model })) {
     let payload;
@@ -260,10 +268,12 @@ export async function verifyBatch(candidates, env, { model = env.VALIDATOR_MODEL
     chunk.forEach((candidate, index) => {
       const supported = noulProbability(answers[`${index}_supported`]);
       const preserved = noulProbability(answers[`${index}_preserved`]);
-      if (supported != null && preserved != null && supported >= CLEF_ACCEPT_PROBABILITY && preserved >= CLEF_ACCEPT_PROBABILITY) accepted.set(candidate.id, candidate.headline);
+      if (supported == null || preserved == null) return; // no decision: keep the original, retry later
+      if (supported >= CLEF_ACCEPT_PROBABILITY && preserved >= CLEF_ACCEPT_PROBABILITY) accepted.set(candidate.id, candidate.headline);
+      else rejected.add(candidate.id);
     });
   }
-  if (failed) return { accepted, status: 'provider_unavailable', usage };
-  const status = !accepted.size ? 'rejected' : accepted.size === candidates.length ? 'ok' : 'partial';
-  return { accepted, status, usage };
+  if (failed) return { accepted, rejected, status: 'provider_unavailable', usage };
+  const status = accepted.size === candidates.length ? 'ok' : accepted.size ? 'partial' : 'rejected';
+  return { accepted, rejected, status, usage };
 }

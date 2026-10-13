@@ -214,6 +214,35 @@ test('Malformed or duplicate model items fall back cleanly', async () => {
   const duplicate = await rewriteBatch([base], { AI: { run: async () => ({ response: { items: [result('לפי המשטרה, 3 בני אדם נפצעו באירוע'), result('לפי המשטרה, 3 בני אדם נפצעו באירוע')] } }) } });
   assert.equal(duplicate.candidates.length, 0);
 });
+
+// A model omission is not a review decision. Only articles the model actually answered
+// are reported as `evaluated`, so the caller can refuse to cache an unverified omission
+// as if it were a source-grounded rejection.
+test('A model omission is not a decision: only answered articles are evaluated', async () => {
+  const items = [base, { ...base, id: 'story-2' }];
+  const env = { AI: { run: async () => ({ response: JSON.stringify({ items: [result('לפי המשטרה, 3 בני אדם נפצעו באירוע')] }) }) } };
+  const { candidates, evaluated, status } = await rewriteBatch(items, env);
+  assert.equal(status, 'partial');
+  assert.deepEqual([...evaluated], ['story-1']); // the omitted article was never answered
+  assert.deepEqual(candidates.map((candidate) => candidate.id), ['story-1']);
+});
+
+// A definitive clef no is a decision; a missing/ambiguous answer is not. Only the
+// former may be cached as a rejection.
+test('An ambiguous clef answer is distinguished from a definitive rejection', async () => {
+  const candidates = [
+    { ...base, id: 'definite', headline: 'לפי המשטרה, 3 בני אדם נפצעו באירוע' },
+    { ...base, id: 'ambiguous', headline: 'לפי המשטרה, 3 בני אדם נפצעו באירוע' }
+  ];
+  const env = { AI: { run: async () => ({ model: 'clef-flash', answers: {
+    '0_supported': { type: 'noul', noul: 0 }, '0_preserved': { type: 'noul', noul: 1 }, // definitive no
+    '1_supported': { type: 'noul', noul: 1 } // no preserved answer: ambiguous, no decision
+  } }) } };
+  const { accepted, rejected } = await verifyBatch(candidates, env);
+  assert.equal(accepted.size, 0);
+  assert.deepEqual([...rejected], ['definite']);
+  assert.ok(!rejected.has('ambiguous'));
+});
 test('Expensive models are blocked before inference; Qwen3 is an allowed cheap model', async () => {
   const AI = { run: () => { throw new Error('Must not run'); } };
   assert.equal((await rewriteBatch([base], { AI, REWRITE_MODEL: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' })).status, 'budget_guard');

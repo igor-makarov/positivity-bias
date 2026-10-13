@@ -7,6 +7,24 @@
 - Sessions/control are on `shurik-control/main`; iterations continue immediately
   (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
+## Verified (2026-10-13, iteration 2-12)
+
+26. **A model omission was cached as a source-grounded rejection.** `rewritePending`
+    cached a rejection for every non-accepted article whenever the batch status was
+    `ok`/`partial`/`rejected`, even though its own comment promised to cache only
+    "source-grounded rejections". When the model returned fewer items than requested
+    (`partial`), the omitted articles were marked `rejected` with a matching
+    `rewriteSource`, so `needsRewrite` skipped them forever and they were never retried.
+    `rewriteBatch` now reports the `evaluated` ids it actually answered and `verifyBatch`
+    reports the ids with a *definitive* clef no (`rejected`) separately from accepted and
+    from missing/ambiguous answers; the worker caches a rejection only for a guard-rejected
+    answered item or a definitive clef no, and keeps+retries everything else. No trusted
+    rewrite changes meaning, so no fingerprint bump was needed. Unit regressions cover the
+    omission and the ambiguous-answer split; `npm run test:pipeline` now runs a `partial`
+    mock that drops one article, proves the omitted article stays `original` (not cached)
+    and is rewritten on the next refresh. Both new assertions were shown to fail against the
+    pre-fix loop (omitted article served as `rejected`, zero retry calls) and pass after it.
+
 ## Verified (2026-10-13, iteration 2-11)
 
 23. **Headline-less trusted rewrite could still be served.** `retireStaleRewrites`
@@ -257,15 +275,15 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Latest full validation (iteration 2-11): `npm run check`, **56 unit tests**,
+Latest full validation (iteration 2-12): `npm run check`, **58 unit tests**,
 `npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`
 (adds the current-fingerprint headless-rewrite serve-time regression),
-`npm run test:pipeline` (mock model end-to-end, retire/reprocess and honest
-invalid-response status), `npm run test:batch`
+`npm run test:pipeline` (mock model end-to-end, retire/reprocess, honest
+invalid-response status and the model-omission retry), `npm run test:batch`
 (validator-window splitting, budget-aware reduction and the documented clef decision
 schema), `npm run test:browser` and `npm run test:interaction` all pass. The
-headline-less-decision regression was shown to fail against the pre-fix early return
-(both unit and workerd serve paths) and pass after the fix.
+model-omission regression was shown to fail against the pre-fix caching loop (the
+omitted article stored as `rejected`, zero retry calls) and pass after the fix.
 
 Live re-check (iteration 2-9): four live ynet article pages and two live mako article
 pages extracted `complete` bodies (1,872–7,620 chars, one truncated at the 6,000-char

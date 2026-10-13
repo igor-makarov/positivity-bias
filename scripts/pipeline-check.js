@@ -118,5 +118,27 @@ try {
   assert.ok(fixed, 'reprocessed article missing');
   assert.equal(fixed.rewriteStatus, 'rewritten');
   assert.equal(fixed.headline, 'לפי המועצה אושרו 3 תוכניות');
-  console.log('Pipeline passed: full-text context, bounded rewrite+verify, independent acceptance/rejection, usage ledger, budget deferral, and stale-rewrite retirement with reprocessing.');
+
+  // A model omission is not a source-grounded rejection. When the model answers only
+  // one of two articles, the omitted article must keep its preserved original and be
+  // retried on the next refresh, not be cached as if clef had rejected it and skipped
+  // forever.
+  const partialStore = namespace.get(namespace.idFromName('partial'));
+  const partialEnv = { REWRITE_MODEL: '@cf/meta/llama-3.1-8b-instruct-fp8-fast', VALIDATOR_MODEL: '@cf/cloudflare/clef-flash',
+    DAILY_NEURON_BUDGET: '6000', CONTEXT_CHARS: '6000', MAX_CONTEXT_FETCHES: '4', MOCK_REWRITE: 'partial' };
+  const partialSeed = { articles: [], updatedAt: null, lastAttemptAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+    policyFingerprint: null, rewriteStatus: 'not_configured', sources: [] };
+  const partial = await (await partialStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: partialSeed, env: partialEnv }) })).json();
+  assert.equal(partial.result.state, 'complete');
+  const afterPartial = await (await partialStore.fetch('https://news.internal/snapshot')).json();
+  const omitted = afterPartial.articles.find((article) => article.id.endsWith('/2'));
+  assert.ok(omitted, 'omitted article missing');
+  assert.equal(omitted.headline, omitted.originalHeadline);
+  assert.equal(omitted.rewriteStatus, 'original'); // an omission is never cached as a rejection
+  const answered = afterPartial.articles.find((article) => article.id.endsWith('/1'));
+  assert.equal(answered.rewriteStatus, 'rewritten'); // the answered article is still processed
+  const retriedSeed = { ...afterPartial, lastAttemptAt: new Date(Date.now() - 2 * 3_600_000).toISOString() };
+  const retried = await (await partialStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: retriedSeed, env: partialEnv }) })).json();
+  assert.ok(retried.calls.rewrite > 0, 'an omitted article must be retried, not cached as rejected');
+  console.log('Pipeline passed: full-text context, bounded rewrite+verify, independent acceptance/rejection, usage ledger, budget deferral, model-omission retry, and stale-rewrite retirement with reprocessing.');
 } finally { await mf.dispose().catch(() => {}); await rm(directory, { recursive: true, force: true }).catch(() => {}); }

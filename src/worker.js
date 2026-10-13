@@ -184,7 +184,7 @@ export class NewsStore {
       let spent = rewrite.usage ?? null;
       const verified = rewrite.candidates.length
         ? await verifyBatch(rewrite.candidates, this.env, { model: validator })
-        : { accepted: new Map(), usage: null, status: 'rejected' };
+        : { accepted: new Map(), rejected: new Set(), usage: null, status: 'rejected' };
       if (verified.usage != null) spent = (spent ?? 0) + verified.usage;
       this.reconcileUsage(day, estimate, spent ?? estimate);
       for (const [id, headline] of verified.accepted) {
@@ -192,12 +192,20 @@ export class NewsStore {
         if (article) { article.headline = headline; article.rewriteStatus = 'rewritten'; article.rewriteFingerprint = fingerprint; }
         accepted++;
       }
-      // Cache the validation decision for source-grounded rejections so the same
-      // articles are not re-fetched and re-inferred every refresh. Provider/parse
-      // failures and missing context are not cached and may be retried.
+      // Cache the decision for source-grounded rejections so the same articles are not
+      // re-fetched and re-inferred every refresh. A rejection is cached only when the
+      // pipeline actually decided on the article: the model answered it and the
+      // deterministic guard rejected its candidate, or clef returned a definitive no.
+      // An article the model omitted, or a candidate whose clef answer was
+      // missing/ambiguous, keeps the preserved original and is retried later instead of
+      // being cached as a rejection it never received. Provider/parse failures and
+      // missing context are likewise not cached.
       if (['ok', 'partial', 'rejected'].includes(rewrite.status) && ['ok', 'partial', 'rejected'].includes(verified.status)) {
+        const candidateIds = new Set(rewrite.candidates.map((candidate) => candidate.id));
         for (const { article } of sized) {
           if (verified.accepted.has(article.id)) continue;
+          const guardRejected = rewrite.evaluated?.has(article.id) && !candidateIds.has(article.id);
+          if (!guardRejected && !verified.rejected?.has(article.id)) continue;
           article.rewriteStatus = 'rejected';
           article.rewriteFingerprint = fingerprint;
           article.rewriteSource = sourceFingerprint(article);
