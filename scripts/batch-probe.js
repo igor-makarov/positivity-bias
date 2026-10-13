@@ -6,7 +6,7 @@ import { rewriteItems } from './fixtures.js';
 
 const VALIDATOR = '@cf/cloudflare/clef-flash';
 
-function createMockAI() {
+function createMockAI(invalidFirst = false) {
   const calls = { rewrite: 0, verify: 0, maxVerifyChars: 0, maxRewriteChars: 0 };
   const run = async (model, input) => {
     if (model === VALIDATOR) {
@@ -18,9 +18,13 @@ function createMockAI() {
         answers[`${index}_headline`] = { type: 'choice', choice: 'option_1', confidence: 1,
           probabilities: Object.fromEntries([...item.alternatives.map(({ id }) => id), 'original'].map((id) => [id, id === 'option_1' ? 1 : 0])) };
       });
+      for (const [id, question] of Object.entries(input.questions)) {
+        if (question.type === 'noul') answers[id] = { type: 'noul', noul: answers[`${id.split('_')[0]}_headline`].choice === 'original' ? 0 : 1 };
+      }
       return { model: 'clef-flash', answers, usage: { input_tokens: 2000, output_tokens: 0 } };
     }
     calls.rewrite++;
+    if (invalidFirst && calls.rewrite === 1) return { response: 'not json' };
     const items = rewriteItems(input);
     calls.maxRewriteChars = Math.max(calls.maxRewriteChars, JSON.stringify(items).length);
     // A changed headline, so coverage cannot count unchanged echoes as conversions.
@@ -44,7 +48,7 @@ export class BatchStore extends NewsStore {
     }
     if (url.pathname === '/run' && request.method === 'POST') {
       const body = await request.json();
-      const mock = createMockAI();
+      const mock = createMockAI(body.env?.MOCK_INVALID_FIRST === true);
       this.env = { ...this.env, ...(body.env || {}), AI: mock };
       if (body.snapshot) this.writeSnapshot(body.snapshot);
       const result = await this.refresh();

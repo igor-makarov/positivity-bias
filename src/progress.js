@@ -32,6 +32,19 @@ export function boundedPublisherFetch(fetcher, limit = 44) {
   return bounded;
 }
 
+// Keep full HTML bodies and outgoing connections bounded while preserving order.
+export async function mapConcurrently(items, mapper, width = 4) {
+  const results = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(width, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await mapper(items[index], index);
+    }
+  }));
+  return results;
+}
+
 export function rewriteCoverage(articles, fingerprint) {
   const total = articles.length;
   const rewritten = articles.filter((article) => article.rewriteStatus === 'rewritten'

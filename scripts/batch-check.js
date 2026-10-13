@@ -78,9 +78,9 @@ try {
     lastAttemptAt: new Date(now - 2 * 3_600_000).toISOString(), policyFingerprint: null, rewriteStatus: 'not_configured', sources: [] };
   const partial = await (await partialStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: partialSeed,
     env: { REWRITE_MODEL: '@cf/meta/llama-3.1-8b-instruct-fp8-fast', VALIDATOR_MODEL: '@cf/cloudflare/clef-flash',
-      DAILY_NEURON_BUDGET: '80', CONTEXT_CHARS: '6000', MAX_CONTEXT_FETCHES: '20' } }) })).json();
+      DAILY_NEURON_BUDGET: '100', CONTEXT_CHARS: '6000', MAX_CONTEXT_FETCHES: '20' } }) })).json();
   assert.equal(partial.result.state, 'complete');
-  // The 80-neuron budget cannot cover all nine articles at once, but the first planned
+  // The 100-neuron budget cannot cover all nine articles at once, but the first planned
   // batch is REDUCED to what fits instead of deferring every article in it. Reporting
   // provider usage lets the ledger free headroom, so a small prefix still gets through.
   assert.ok(partial.calls.rewrite >= 1, `expected a reduced batch, got ${partial.calls.rewrite}`);
@@ -91,7 +91,7 @@ try {
   assert.equal(rewritten, partial.calls.rewrite);
   assert.equal(partialSnapshot.articles.filter((article) => article.rewriteStatus === 'original').length, COUNT - rewritten);
   const partialUsage = await (await partialStore.fetch('https://news.internal/usage')).json();
-  assert.ok(partialUsage.used > 0 && partialUsage.used <= 80, `partial usage overspent: ${partialUsage.used}`);
+  assert.ok(partialUsage.used > 0 && partialUsage.used <= 100, `partial usage overspent: ${partialUsage.used}`);
 
   // Finite continuation covers retained backlog despite inaccessible first pages.
   // No article may be retried by a continuation in the same edition.
@@ -106,7 +106,12 @@ try {
   for (let round = 0; round < 6; round++) {
     backlog = await (await backlogStore.fetch('https://news.internal/snapshot')).json();
     if (!backlog.rewriteContinuation) break;
-    await backlogStore.fetch('https://news.internal/continue', { method: 'POST' });
+    const [, overlappingRefresh] = await Promise.all([
+      backlogStore.fetch('https://news.internal/continue', { method: 'POST' }),
+      backlogStore.fetch('https://news.internal/refresh', { method: 'POST' })
+    ]);
+    assert.equal(overlappingRefresh.status, 200);
+    assert.ok((await overlappingRefresh.json()).state, 'overlapping refresh must return a JSON result');
   }
   backlog = await (await backlogStore.fetch('https://news.internal/snapshot')).json();
   assert.equal(backlog.rewriteContinuation, undefined);
@@ -117,5 +122,22 @@ try {
   assert.equal(backlog.rewriteDiagnostics.accepted, 24);
   assert.equal(backlog.refreshing, false);
 
-  console.log(`Batch passed: ${COUNT} full-text articles split into ${run.calls.rewrite} requests, each verification within the ${window}-token validator window; usage ${Math.round(usage.used)} neurons; a 80-neuron budget processes a reduced prefix (${partial.calls.rewrite}) instead of deferring all nine.`);
+  const isolatedStore = namespace.get(namespace.idFromName('isolated-error'));
+  await isolatedStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: { ...seeded, articles: backlogArticles },
+    env: { DAILY_NEURON_BUDGET: '6000', MAX_CONTEXT_FETCHES: '6', CONTEXT_CHARS: '6000', MOCK_MANUAL_ALARMS: true, MOCK_INVALID_FIRST: true } }) });
+  for (let round = 0; round < 6; round++) {
+    const snapshot = await (await isolatedStore.fetch('https://news.internal/snapshot')).json();
+    if (!snapshot.rewriteContinuation) break;
+    await isolatedStore.fetch('https://news.internal/continue', { method: 'POST' });
+  }
+  const isolated = await (await isolatedStore.fetch('https://news.internal/snapshot')).json();
+  assert.equal(isolated.rewriteContinuation, undefined);
+  assert.equal(isolated.rewriteCoverage.rewritten, 22);
+  assert.equal(isolated.rewriteCoverage.sourceUnavailable, 4);
+  assert.equal(isolated.rewriteCoverage.pending, 2);
+  assert.equal(isolated.rewriteDiagnostics.contextCandidates, 28);
+  assert.equal(isolated.rewriteStatus, 'partial');
+  assert.equal(isolated.rewriteDiagnostics.failureStage, 'rewrite');
+
+  console.log(`Batch passed: ${COUNT} full-text articles split into ${run.calls.rewrite} requests, each verification within the ${window}-token validator window; usage ${Math.round(usage.used)} neurons; a 100-neuron budget processes a reduced prefix (${partial.calls.rewrite}) instead of deferring all nine.`);
 } finally { await mf.dispose().catch(() => {}); await rm(directory, { recursive: true, force: true }).catch(() => {}); }

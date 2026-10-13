@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { boundedPublisherFetch, pendingArticles, rewriteCoverage } from '../src/progress.js';
+import { boundedPublisherFetch, mapConcurrently, pendingArticles, rewriteCoverage } from '../src/progress.js';
 import { sourceFingerprint } from '../src/policy.js';
 import { mergeArticles } from '../src/news.js';
 
@@ -46,6 +46,17 @@ test('Publisher request accounting stops before the Free subrequest ceiling', as
   await fetcher('https://publisher.test'); await fetcher('https://publisher.test/redirect');
   assert.throws(() => fetcher('https://publisher.test/next'), /subrequest_budget/);
   assert.equal(calls, 2); assert.equal(fetcher.remaining(), 0);
+});
+
+test('Large context batches keep at most four full HTML loads active and preserve article order', async () => {
+  let active = 0, peak = 0;
+  const result = await mapConcurrently(Array.from({ length: 40 }, (_, i) => i), async (item) => {
+    active++; peak = Math.max(peak, active);
+    await Promise.resolve();
+    active--; return item * 2;
+  });
+  assert.equal(peak, 4);
+  assert.deepEqual(result, Array.from({ length: 40 }, (_, i) => i * 2));
 });
 
 test('Coverage counts genuine changed current-policy titles over the full feed', () => {

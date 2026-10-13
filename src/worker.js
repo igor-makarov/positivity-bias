@@ -6,7 +6,7 @@ import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, REWRITE_CONTRACT_VERSIO
 import { rewriteBatch, verifyBatch } from './rewrite.js';
 import { budgetDecision, dailyNeuronBudget, estimateBatchNeurons, fitBatchToBudget, planBatches, requestContextTokens, SHARED_RESERVED_TOKENS_PER_ITEM } from './budget.js';
 import { HOUR, refreshDue } from './refresh.js';
-import { boundedPublisherFetch, pendingArticles, rewriteCoverage } from './progress.js';
+import { boundedPublisherFetch, mapConcurrently, pendingArticles, rewriteCoverage } from './progress.js';
 
 const sources = validateWebsites(configuration);
 // A changed policy gets one immediate refresh. Persist
@@ -139,7 +139,7 @@ export class NewsStore {
     const pending = pendingArticles(snapshot.articles, policyFingerprint(this.env), now, 1, Date.parse(snapshot.lastAttemptAt));
     const hasBudget = this.readUsage(this.usageDay(now)) < dailyNeuronBudget(this.env);
     const more = continuation?.roundsLeft > 0 && pending.length && hasBudget && snapshot.rewriteStatus !== 'budget_deferred'
-      && !snapshot.rewriteDiagnostics?.failureStage && !['provider_unavailable', 'validator_misconfigured', 'budget_guard'].includes(snapshot.rewriteStatus);
+      && !['provider_unavailable', 'validator_misconfigured', 'budget_guard'].includes(snapshot.rewriteStatus);
     if (!more) delete snapshot.rewriteContinuation;
     this.writeSnapshot(snapshot);
     if (more) await this.state.storage.setAlarm(Date.now() + 1_000);
@@ -158,13 +158,14 @@ export class NewsStore {
     const snapshot = this.readSnapshot();
     const continuation = snapshot.rewriteContinuation;
     const now = Date.now();
-    if (!continuation) return;
+    if (!continuation) return { state: 'idle' };
     if (continuation.policy !== policyFingerprint(this.env) || continuation.day !== this.usageDay(now)) {
-      delete snapshot.rewriteContinuation; this.writeSnapshot(snapshot); return;
+      delete snapshot.rewriteContinuation; this.writeSnapshot(snapshot); return { state: 'continuation_expired' };
     }
     continuation.roundsLeft--;
     await this.rewritePending(snapshot, now, boundedPublisherFetch(fetch));
     await this.finishRewriteChunk(snapshot, now);
+    return { state: 'rewrite_continuation', articles: snapshot.articles.length, rewriteStatus: snapshot.rewriteStatus };
   }
 
   // Adaptive, token-budgeted rewriting. Each request is sized from the actual
@@ -190,11 +191,11 @@ export class NewsStore {
     // Fetch accessible article text once, bounded, so each request is sized from the
     // actual full-text input instead of a worst-case length. Missing context is not
     // cached and keeps the original headline.
-    const prepared = await Promise.all(pending.map(async (article) => {
+    const prepared = await mapConcurrently(pending, async (article) => {
       const source = sources.find((entry) => entry.id === article.sourceId);
       if (!source) return { article, context: { text: '', charCount: 0, completeness: 'missing' }, error: 'unknown_source' };
       return { article, ...(await loadArticleContext(article, source, publisherFetch, { maxChars: chars })) };
-    }));
+    });
     for (const { article, context, error } of prepared) {
       article.rewriteAttemptAt = new Date(now).toISOString();
       article.rewriteAttemptPolicy = fingerprint;
@@ -298,7 +299,7 @@ export class NewsStore {
       if (verified.status === 'provider_unavailable' || verified.status === 'validator_misconfigured') { snapshot.rewriteStatus = verified.status; providerFailed = true; break; }
     }
     snapshot.rewriteStatus = providerFailed ? snapshot.rewriteStatus
-      : invalidResponse ? accepted ? 'partial' : 'invalid_response' : deferred ? 'budget_deferred' : 'ok';
+      : deferred ? 'budget_deferred' : invalidResponse || diagnostics.failureStage ? diagnostics.accepted ? 'partial' : 'invalid_response' : 'ok';
   }
 }
 

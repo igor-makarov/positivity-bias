@@ -83,15 +83,16 @@ or missing) to the model. The editorial prompt requires the primary point and it
 material context — actor/speaker, action, geographic scope and result — and never
 reverses an outcome. Missing context keeps the original headline.
 
-The rewrite call proposes three distinct dry alternatives per article. Clef Flash
-compares them against the same source with one native `choice` question per article,
-including an explicit `original` fallback. A qualifying alternative must both support
-every asserted claim and preserve the primary point and material context. Only a
-consistent selection whose option probability is 0.7 or higher publishes a changed headline. Missing,
-malformed or uncertain answers preserve originals and remain retryable at the next
-edition; a confident original selection is cached. Calls respect the 64-question and
-24,576-token limits. Clef charges input tokens only. Native distribution confidence is diagnostic metadata;
-the acceptance boundary uses the selected option probability, which can differ from it.
+The rewrite call proposes three distinct dry alternatives per article. In one native
+Clef Flash call, two independent `noul` checks per alternative assess factual support
+and preservation of the primary point and material context; a `choice` question ranks
+the alternatives and provides an explicit original fallback. Both checks must reach
+0.7 for an alternative to qualify. The clearest qualifying alternative is selected;
+choice probabilities rank wording, rather than measuring factual validity. Native
+distribution confidence is diagnostic metadata and can differ from option probability.
+Missing, malformed or uncertain checks preserve originals and remain retryable at the
+next edition. A confident original selection with no qualifying alternatives is cached.
+Calls respect the 64-question and 24,576-token limits. Clef charges input tokens only.
 
 Rewrite requests use a JSON schema with short, request-local article IDs; those IDs
 are restored to the original article identity before factual verification or storage.
@@ -106,7 +107,7 @@ Requests are sized adaptively from the actual full-text input, the context windo
 reserved output space and the remaining daily budget. The same context goes to both
 the rewrite model and the validator, so each request is limited to the **smaller** of
 their context windows (`clef-flash` is 24,576 tokens) and output space is reserved per
-article (three full short alternatives plus the choice question). The project reserves a
+article (three full short alternatives plus the choice and factual-check questions). The project reserves a
 conservative slice of the shared **10,000-neuron/day** free allocation
 (`DAILY_NEURON_BUDGET`, default 6000), persists the reservation before any model
 call, reconciles it with provider-reported usage, and defers work instead of
@@ -116,7 +117,8 @@ Each edition processes the retained backlog in at most 14 finite chunks, with pr
 persisted between Durable Object alarms. Feed and article redirects share a counter
 below the Free plan's 50-external-request ceiling. Each article gets at most one model
 attempt per edition. Inaccessible bodies wait a day before another fetch, so they do
-not starve untouched articles. Processing stops on provider failures or budget limits.
+not starve untouched articles. Malformed/omitted model results preserve their own originals while unrelated backlog
+continues; provider failures and budget limits stop processing.
 The existing ingestion cron remains hourly; this is not a Codex monitor or Shurik loop.
 `/api/status` reports real changed-title coverage across the full feed, missing-source
 and pending counts, and the project's daily neuron ledger. Unknown provider usage

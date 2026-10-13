@@ -17,12 +17,13 @@ const answer = (choice = 'option_1', confidence = 1, ids = ['option_1', 'option_
   type: 'choice', choice, confidence,
   probabilities: Object.fromEntries(ids.map((id) => [id, id === choice ? confidence : (1 - confidence) / (ids.length - 1)]))
 });
-const selectionEnv = (answers) => ({ AI: { run: async (model, input) => {
+const selectionEnv = (answers, checks = {}) => ({ AI: { run: async (model, input) => {
   assert.equal(model, DEFAULT_VALIDATOR_MODEL); assert.equal(input.model, 'clef-flash');
   assert.equal(input.messages, undefined); assert.equal(input.max_tokens, undefined); assert.equal(input.response_format, undefined);
-  assert.equal(Object.keys(input.questions).length, input.state.length);
-  assert.ok(Object.values(input.questions).every((q) => q.type === 'choice'));
-  return { answers };
+  assert.ok(Object.keys(input.questions).length <= 64);
+  const verdicts = Object.fromEntries(Object.entries(input.questions).filter(([, q]) => q.type === 'noul')
+    .map(([id]) => [id, { type: 'noul', noul: answers[`${id.split('_')[0]}_headline`]?.choice === 'original' ? 0 : 1 }]));
+  return { answers: { ...verdicts, ...answers, ...checks } };
 } } });
 const messages = (input) => {
   if (input.messages) return input.messages;
@@ -126,7 +127,7 @@ test('All source control tokens stay untrusted data in Qwen raw mode', async () 
 test('Only a confident, consistent native choice can publish a rewrite', async () => {
   const good = answer('option_1', CLEF_ACCEPT_PROBABILITY);
   assert.equal((await verifyBatch([candidate()], selectionEnv({ '0_headline': good }))).accepted.size, 1);
-  const invalid = [answer('option_1', 0.5), { ...good, confidence: NaN }, { ...good, type: 'noul' },
+  const invalid = [{ ...good, confidence: NaN }, { ...good, type: 'noul' },
     { ...good, choice: 'unknown' }, { ...good, probabilities: {} }, { ...good, probabilities: { ...good.probabilities, original: 0.99 } },
     { ...good, confidence: 2 }, null];
   for (const value of invalid) {
@@ -141,8 +142,22 @@ test('Native distribution certainty can differ from the selected option probabil
   assert.equal(result.answerShape.confidence, 0.25);
   assert.equal(result.answerShape.selectedProbability, 0.8);
 });
-test('A weak choice is answered but undecided, without being cached as a rejection', async () => {
-  const result = await verifyBatch([candidate()], selectionEnv({ '0_headline': answer('option_1', 0.5) }));
+test('Choice ranks qualifying options even when probability splits across faithful alternatives', async () => {
+  const result = await verifyBatch([candidate()], selectionEnv({ '0_headline': answer('option_1', 0.4) }));
+  assert.equal(result.accepted.get(base.id), faithful);
+});
+test('Both independent checks must pass; an unsupported favorite cannot outrank a qualified sibling', async () => {
+  const checks = { '0_option_1_supported': 0, '0_option_2_preserved': 0 };
+  const result = await verifyBatch([candidate()], selectionEnv({ '0_headline': answer('option_1', 0.8) }, checks));
+  assert.equal(result.accepted.get(base.id), alternatives[2]);
+});
+test('A choice with no factual/material-context answers is not verification', async () => {
+  const result = await verifyBatch([candidate()], { AI: { run: async () => ({ answers: { '0_headline': answer() } }) } });
+  assert.equal(result.accepted.size, 0); assert.equal(result.answered.size, 0);
+});
+test('Uncertain factual checks are answered but undecided, without being cached as a rejection', async () => {
+  const checks = Object.fromEntries(alternatives.flatMap((_, i) => ['supported', 'preserved'].map((key) => [`0_option_${i + 1}_${key}`, { type: 'noul', noul: 0.5 }])));
+  const result = await verifyBatch([candidate()], selectionEnv({ '0_headline': answer('option_1', 0.5) }, checks));
   assert.equal(result.answered.size, 1); assert.equal(result.evaluated.size, 0);
 });
 test('Chat/noul answers cannot masquerade as native selections', async () => {
@@ -153,7 +168,8 @@ test('Chat/noul answers cannot masquerade as native selections', async () => {
 });
 test('Unknown verification usage stays unknown for conservative ledger reconciliation', async () => {
   assert.equal((await verifyBatch([candidate()], selectionEnv({ '0_headline': answer() }))).usage, null);
-  const result = await verifyBatch([candidate()], { AI: { run: async () => ({ result: { answers: { '0_headline': answer() }, usage: { input_tokens: 1000, output_tokens: 0 } } }) } });
+  const checks = Object.fromEntries(alternatives.flatMap((_, i) => ['supported', 'preserved'].map((key) => [`0_option_${i + 1}_${key}`, 1])));
+  const result = await verifyBatch([candidate()], { AI: { run: async () => ({ result: { answers: { ...checks, '0_headline': answer() }, usage: { input_tokens: 1000, output_tokens: 0 } } }) } });
   assert.ok(result.usage > 0); assert.equal(result.accepted.size, 1);
 });
 test('Validator windows and question count are respected without silently truncating records', () => {

@@ -26,6 +26,9 @@ function createMockAI(validatorModel, rewriteMode, validatorMode) {
         answers[`${index}_headline`] = { type: 'choice', choice, confidence: 1,
           probabilities: Object.fromEntries([...item.alternatives.map(({ id }) => id), 'original'].map((id) => [id, id === choice ? 1 : 0])) };
       });
+      for (const [id, question] of Object.entries(input.questions)) {
+        if (question.type === 'noul') answers[id] = { type: 'noul', noul: answers[`${id.split('_')[0]}_headline`].choice === 'original' ? 0 : 1 };
+      }
       return { model: 'clef-flash', answers, usage: { input_tokens: 1000, output_tokens: 0 } };
     }
     calls.rewrite++;
