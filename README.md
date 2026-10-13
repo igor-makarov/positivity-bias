@@ -165,6 +165,9 @@ keep credentials only in secrets.
   `offset`; includes category options, source states, freshness and original titles.
 - `/api/status`: source/freshness/rewrite status and bounded rewrite counters, failure
   stage and completion reason. No article bodies, key values or provider responses.
+- During a background refresh, the page checks for its result up to ten times and
+  stops when it completes. An unsubmitted search is preserved; no periodic checkup
+  or per-visitor inference loop is created.
 - No public refresh/admin endpoint. Cron invokes the internal Durable Object.
 - A failed source does not replace the last successful articles; old articles expire
   after 72 hours. Stale or partial coverage is visible in the interface.

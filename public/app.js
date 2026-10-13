@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const state = { order: 'broad', offset: 0, loading: false, controller: null, requestId: 0, filters: '' };
+const state = { order: 'broad', offset: 0, loading: false, controller: null, requestId: 0, filters: '', refreshTimer: null, refreshPolls: 0 };
 const dateFormat = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jerusalem' });
 const timeFormat = new Intl.DateTimeFormat('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jerusalem' });
 $('edition-date').textContent = dateFormat.format(new Date());
@@ -63,12 +63,16 @@ function renderSources(sources) {
   }));
 }
 
-async function load(append = false) {
+async function load(append = false, refreshPoll = false) {
+  clearTimeout(state.refreshTimer);
+  if (!refreshPoll) state.refreshPolls = 0;
+  let refreshing = false;
   const requestId = ++state.requestId;
   state.controller?.abort();
   state.controller = new AbortController(); state.loading = true;
   $('articles').setAttribute('aria-busy', 'true'); $('more').disabled = true;
   const params = new URLSearchParams(new FormData($('filters')));
+  const submittedFilters = params.toString();
   params.set('order', state.order); params.set('offset', String(append ? state.offset : 0)); params.set('limit', '30');
   state.filters = params.toString();
   try {
@@ -76,6 +80,7 @@ async function load(append = false) {
     if (!response.ok) throw new Error('unavailable');
     const data = await response.json();
     if (requestId !== state.requestId) return;
+    refreshing = data.refreshing === true;
     if (!append) { $('articles').replaceChildren(); state.offset = 0; }
     for (const article of data.articles) { const row = renderArticle(article); if (row) $('articles').append(row); }
     state.offset += data.articles.length;
@@ -88,6 +93,7 @@ async function load(append = false) {
     if (data.categories.includes(selected)) $('category').value = selected;
     renderSources(data.sources);
     const notices = [];
+    if (refreshing) notices.push('אוספים עדכונים חדשים. התמונה תתעדכן כשהאיסוף יסתיים.');
     if (data.stale && data.updatedAt) notices.push('העדכונים המוצגים אינם עדכניים. זמני הפרסום מופיעים לצד כל ידיעה.');
     if (data.articles.some((article) => article.rewriteStatus !== 'rewritten')) notices.push('חלק מהכותרות מוצגות בנוסח המקורי ומסומנות בהתאם.');
     if (data.sources.some((source) => source.state === 'unavailable' || source.state === 'partial')) notices.push('חלק מהמקורות אינם מתעדכנים במלואם כרגע.');
@@ -98,7 +104,16 @@ async function load(append = false) {
     else { $('notice').textContent = 'לא הצלחנו לטעון עדכונים נוספים. אפשר לנסות שוב.'; $('notice').hidden = false; }
     $('freshness').textContent = 'העדכון אינו זמין כרגע';
   } finally {
-    if (requestId === state.requestId) { state.loading = false; $('articles').setAttribute('aria-busy', 'false'); $('more').disabled = false; }
+    if (requestId === state.requestId) {
+      state.loading = false; $('articles').setAttribute('aria-busy', 'false'); $('more').disabled = false;
+      if (refreshing && !append && state.refreshPolls < 10) {
+        state.refreshPolls++;
+        state.refreshTimer = setTimeout(() => {
+          // Preserve an unsubmitted search and cancel stale polling on interaction.
+          if (requestId === state.requestId && new URLSearchParams(new FormData($('filters'))).toString() === submittedFilters) load(false, true);
+        }, 5000);
+      }
+    }
   }
 }
 

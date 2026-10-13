@@ -93,7 +93,7 @@ export class NewsStore {
     if (refreshDue(snapshot.lastAttemptAt) || policyRecoveryDue(snapshot, this.env)) {
       this.state.waitUntil(this.refresh());
     }
-    return json(snapshot);
+    return json({ ...snapshot, refreshing: Boolean(this.refreshing) });
   }
 
   emptySnapshot() {
@@ -263,7 +263,7 @@ export default {
       const snapshot = await response.json();
       const { articles = [], ...rest } = snapshot;
       const publicStatus = { updatedAt: rest.updatedAt, lastAttemptAt: rest.lastAttemptAt,
-        rewriteStatus: rest.rewriteStatus, sources: rest.sources,
+        rewriteStatus: rest.rewriteStatus, sources: rest.sources, refreshing: rest.refreshing === true,
         stale: !rest.updatedAt || Date.now() - Date.parse(rest.updatedAt) > 2 * HOUR };
       if (url.pathname === '/api/status') return json({ ...publicStatus, rewriteContract: REWRITE_CONTRACT_VERSION,
         lastRefreshContract: rest.lastRefreshPolicy?.split('|').at(-1) ?? null,

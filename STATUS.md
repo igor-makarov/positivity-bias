@@ -9,42 +9,26 @@
 
 ## Live-site repair (2026-10-13)
 
-- Fixed the refresh timing defect: readers and cron now share the same minute-7
-  hourly window, so an off-tick reader refresh cannot suppress the next cron.
-  Failed attempts still cannot cause repeated visitor inference in one window.
-- `/api/status` adds bounded rewrite counters, the failing pipeline stage and the
-  native completion reason, without prompts, article bodies or raw model responses.
-- Verified: 69 unit tests, syntax/registry checks, dry-run build, Worker smoke check
-  and mocked end-to-end rewrite/verification/budget pipeline. Production verification
-  follows deployment; this does not yet establish successful live inference.
-
-### Fresh production evidence and structured-output repair
-
-- The timing fix deployed in commit `7d45945307c9d15dcd08ab71aa03403224e25187`.
-  A direct live refresh at 19:10 UTC returned all four sources healthy: ynet 115,
-  Kan 8, N12 74 and mako 62; all feed errors cleared. Three native rewrite calls
-  finished normally but answered zero requested records, before any verification.
-- Rewrites now request an explicit JSON schema and short request-local IDs, support
-  directly parsed native JSON, and restore original IDs before validation/storage.
-  Clef Flash is the only executable validator. Policy repair permits one recovery
-  attempt inside the current window; repeated failed requests remain bounded.
-- Verified: 71 unit tests, build, Worker smoke, pipeline (including recovery fencing),
-  context/budget batch splitting and cached-rewrite retirement. Native inference
-  verification follows this deployment; mock success is not production evidence.
-
-### Native response-channel evidence and final request correction
-
-- Direct production evidence after the response-channel correction: refresh at
-  19:28 UTC reports all four publishers healthy, with 5 answered records, 4 candidates
-  evaluated by native Clef Flash and 1 accepted rewritten headline. Qwen returned
-  empty `content` and its structured JSON through the alternate channel. No reasoning
-  text was published. A second batch remained invalid, so full repair was not claimed.
-- Qwen now uses the documented raw chat format with its thinking prefix explicitly
-  closed before generation, preserving escaped source control tokens and the full
-  source context. Mixed success/failure now reports `partial` instead of hiding a
-  failed batch behind `ok`. The same daily budget and one-recovery-per-policy guard
-  remain in place. Verified: 73 unit tests, build and Worker pipeline/batch checks;
-  the final native result will be checked after deployment.
+- Fixed refresh windows around the existing minute-7 cron. A reader refresh no longer
+  suppresses the following tick; failed attempts and policy-repair recovery remain
+  serialized and bounded, with the same 6,000-neuron project budget.
+- Fixed native Qwen structured output: explicit JSON schema, short request-local IDs,
+  restored article identity and a raw chat prompt with a closed thinking prefix.
+  Complete alternate-channel schema output remains only a candidate; prose/truncation
+  is rejected. Clef Flash is the only executable validator. Source originals, full
+  transient grounding, and the outcome/material-context regressions are preserved.
+- Direct live verification at 19:37 UTC: all four feeds healthy (ynet 115, Kan 8,
+  N12 74, mako 62), zero feed errors; both rewrite batches completed, all 10 usable
+  contexts answered, all 6 proposed titles evaluated by native Clef, 1 accepted,
+  failureStage=null and rewriteStatus=ok. The public archive contained 217 unique
+  articles with the accepted title displayed and its original preserved.
+- Added bounded page rechecks while a refresh is running, so its completed result
+  appears without manual reload. Polling stops on completion and preserves draft
+  searches. Status exposes contract versions and counts without private model text.
+- Verification: 73 unit tests, syntax/registry checks, dry-run Worker build, smoke,
+  rewrite/budget pipeline, batch splitting, retirement, keyboard/filter/sort/pagination
+  and error/retry checks; browser refresh/draft-search regression checks passed.
+- Shurik and the hourly Codex checkup remain stopped at the user's request.
 
 ## Verified (2026-10-13, iteration 2-17)
 
@@ -495,35 +479,15 @@ publisher served a Radware bot challenge (544 chars, correctly refused — the p
 does not follow challenges). Kan still exposes no `articleSection`, so its categories
 remain missing by policy.
 
-## Blocked / needs input
+## Remaining limits
 
-1. **Cloudflare deployment unverified.** No Cloudflare credentials or account access
-   in this environment; the existing Worker name, build/deploy commands, routes and
-   deployed URL could not be inspected. Reconcile `wrangler.jsonc`
-   (`positivity-bias`) with the connected Workers Builds Worker once access is
-   available. Do not create a parallel deployment.
-2. **Live inference unverified.** Workers AI Hebrew quality and real neuron use remain
-   unmeasured. The default is now `@cf/qwen/qwen3-30b-a3b-fp8` (see 2-16); the switch is
-   wired and safe (any failure keeps the preserved original), but a live account is still
-   needed to measure Hebrew fidelity and confirm neuron consumption. Mocks/fixtures prove
-   wiring and fallbacks only; do not interpret a passing fixture as successful production
-   inference. `@cf/meta/llama-3.1-8b-instruct-fp8-fast` is no longer in the catalog and is
-   kept only as an explicit override (`LLAMA_REWRITE_MODEL`).
-   The previous default's docs page is gone: requesting
-   `.../workers-ai/models/llama-3.1-8b-instruct-fp8-fast/` redirects to
-   `/workers-ai/models/?unavailable=llama-3.1-8b-instruct-fp8-fast` and the slug is
-   absent from the catalog, though the pricing page (Oct 9, 2026) still lists it. The
-   catalog still lists `@cf/qwen/qwen3-30b-a3b-fp8`, which is now the default; a live
-   call must still confirm the account honors the thinking-off option and reports usage.
-   The verifier uses the documented clef schema (`state` + typed `noul` questions →
-   `answers[*].noul`) with the 24,576-token window / input-only pricing; a live account is
-   still needed to measure the *quality* of clef's yes/no probabilities and real neuron
-   use. Both parser paths (chat `choices` and text `response`) are covered.
-3. **Interactive QA.** Keyboard traversal, filter/order/pagination interaction and
-   the rendered error/retry state are now covered by `npm run test:interaction`
-   (see iteration 2-5). Render checks at 390×844 and 1440×1000 passed previously.
-   CI (`ci.yml`) still runs only `npm run check && npm test && npm run build`; adding
-   the workerd/browser checks to CI is a workflow change for the maintainer.
-4. Kan JSON-LD has no `articleSection`, so Kan categories remain missing by policy.
+- Cloudflare Workers Builds and direct public responses now verify deployment and
+  successful native Qwen/Clef inference. Direct account logs and billing totals are
+  unavailable here; the existing project budget remains enforced.
+- The concrete editorial regressions pass. Broader Hebrew editorial-quality review
+  and account-wide neuron measurements remain separate from functional verification.
+- Worker/browser runtime checks pass locally. CI still runs syntax/unit/build checks;
+  changing that workflow is outside this repair.
+- Kan exposes no `articleSection`; its categories remain missing by publisher policy.
 
-Steering goes through `PROMPT.md`; further implementation belongs to Shurik.
+Shurik and its hourly supervisor are stopped. Future work requires a new user request.
