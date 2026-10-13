@@ -25,7 +25,6 @@ const mf = new Miniflare(convertV4MiniflareOptions({
   name: 'positivity-bias', scriptPath: 'dist/worker.js', modules: true, compatibilityDate: '2026-10-13',
   durableObjects: { NEWS: { className: 'NewsStore', useSQLite: true } },
   assets: { directory: 'public', binding: 'ASSETS', run_worker_first: ['/api/*'], routerConfig: { has_user_worker: true } },
-  bindings: { REWRITES_PER_REFRESH: '0' },
   outboundService: fixture.fetch
 }));
 try {
