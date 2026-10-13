@@ -3,7 +3,7 @@ import { plainText } from './news.js';
 export const DEFAULT_REWRITE_MODEL = '@cf/meta/llama-3.1-8b-instruct-fp8-fast';
 const CHEAP_MODELS = new Set([DEFAULT_REWRITE_MODEL, '@cf/meta/llama-3.2-1b-instruct', '@cf/meta/llama-3.2-3b-instruct']);
 
-export const EDITORIAL_PROMPT = `You are the Hebrew headline editor of במבט (Positivity Bias).
+export const EDITORIAL_PROMPT = `You are the Hebrew headline editor of במבט.
 Rewrite headlines into dry, specific, factual Hebrew. Remove sensational framing,
 curiosity gaps, rhetorical questions, emotional adjectives, superlatives, teasing,
 and pressure to click. State the actual event if it is supported by the input.
