@@ -6,7 +6,7 @@
   "supervisor": "a637cd4b71137ca58960dda0bbb0dd487064810d",
   "status": "running",
   "generation": 2,
-  "next": 13,
+  "next": 14,
   "model": "deepseek-v4.1-flash",
   "reasoning": "high",
   "source": "9376c22f0d7d956b36eb4f617db8dcd259ad703f",
