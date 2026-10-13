@@ -79,6 +79,23 @@ try {
   assert.equal(deferred.calls.rewrite, 0);
   assert.equal(deferred.calls.verify, 0);
 
+  // An unparseable model response keeps the originals AND is reported honestly,
+  // instead of a healthy `ok` that would hide a silently failing rewrite pipeline.
+  const invalidStore = namespace.get(namespace.idFromName('invalid'));
+  const invalidSeed = { articles: [], updatedAt: null, lastAttemptAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+    policyFingerprint: null, rewriteStatus: 'not_configured', sources: [] };
+  const invalid = await (await invalidStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: invalidSeed,
+    env: { REWRITE_MODEL: '@cf/meta/llama-3.1-8b-instruct-fp8-fast', VALIDATOR_MODEL: '@cf/cloudflare/clef-flash',
+      DAILY_NEURON_BUDGET: '6000', CONTEXT_CHARS: '6000', MAX_CONTEXT_FETCHES: '4', MOCK_REWRITE: 'invalid' } }) })).json();
+  assert.equal(invalid.result.state, 'complete');
+  assert.equal(invalid.result.rewriteStatus, 'invalid_response');
+  assert.ok(invalid.calls.rewrite > 0);
+  assert.equal(invalid.calls.verify, 0); // nothing to verify without a parsed candidate
+  const invalidServed = await (await invalidStore.fetch('https://news.internal/snapshot')).json();
+  assert.ok(invalidServed.articles.length > 0);
+  assert.ok(invalidServed.articles.every((article) => article.headline === article.originalHeadline)); // originals preserved
+  assert.ok(invalidServed.articles.every((article) => article.rewriteStatus !== 'rewritten')); // and not cached as trusted
+
   // Retirement + reprocessing: a stale wrong cached headline must never be served, and
   // the same article must be reprocessed under the active policy within the same daily
   // budget. The original is restored first, then a fresh, correct rewrite replaces it.

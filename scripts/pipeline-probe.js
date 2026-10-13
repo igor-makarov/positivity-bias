@@ -5,7 +5,7 @@ import worker, { NewsStore } from '../src/worker.js';
 
 const validatorDefault = '@cf/cloudflare/clef-flash';
 
-function createMockAI(validatorModel) {
+function createMockAI(validatorModel, rewriteMode) {
   const calls = { rewrite: 0, verify: 0 };
   const run = async (model, input) => {
     if (model === validatorModel) {
@@ -19,6 +19,8 @@ function createMockAI(validatorModel) {
       return { model: 'clef-flash', answers, usage: { input_tokens: 1000, output_tokens: 0 } };
     }
     calls.rewrite++;
+    // A model that returns unparseable output must be surfaced, not reported as ok.
+    if (rewriteMode === 'invalid') return { response: 'not json' };
     const items = JSON.parse(input.messages[1].content);
     return { response: JSON.stringify({ items: items.map((item) => ({ id: item.id, usable: true,
       headline: /\/2$/.test(item.id) ? 'ראשי ערים קראו לשינוי דמוגרפי בישראל' : 'לפי המועצה אושרו 3 תוכניות' })) }) };
@@ -31,7 +33,7 @@ export class PipelineStore extends NewsStore {
     const url = new URL(request.url);
     if (url.pathname === '/run' && request.method === 'POST') {
       const body = await request.json();
-      const mock = createMockAI(body.env?.VALIDATOR_MODEL || validatorDefault);
+      const mock = createMockAI(body.env?.VALIDATOR_MODEL || validatorDefault, body.env?.MOCK_REWRITE);
       this.env = { ...this.env, ...(body.env || {}), AI: mock };
       if (body.snapshot) this.writeSnapshot(body.snapshot);
       const result = await this.refresh();

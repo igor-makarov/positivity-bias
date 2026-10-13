@@ -160,7 +160,7 @@ export class NewsStore {
     const day = this.usageDay(now);
     const budget = dailyNeuronBudget(this.env);
     const models = { rewrite: model, validator };
-    let accepted = 0, deferred = false, providerFailed = false;
+    let accepted = 0, deferred = false, providerFailed = false, invalidResponse = false;
     for (const batch of batches) {
       // Size this request by the remaining daily budget as well as the context window,
       // so a large planned batch is reduced rather than deferring every article when
@@ -174,6 +174,7 @@ export class NewsStore {
         originalHeadline: article.originalHeadline, publishedAt: article.publishedAt,
         context, contextCompleteness: completeness }));
       const rewrite = await rewriteBatch(items, this.env, { model });
+      if (rewrite.status === 'invalid_response') invalidResponse = true;
       if (rewrite.status === 'provider_unavailable' || rewrite.status === 'budget_guard') {
         this.reconcileUsage(day, estimate, rewrite.usage ?? 0);
         snapshot.rewriteStatus = rewrite.status;
@@ -205,7 +206,7 @@ export class NewsStore {
       if (verified.status === 'provider_unavailable' || verified.status === 'validator_misconfigured') { snapshot.rewriteStatus = verified.status; providerFailed = true; break; }
     }
     snapshot.rewriteStatus = providerFailed ? snapshot.rewriteStatus
-      : accepted ? 'ok' : deferred ? 'budget_deferred' : 'ok';
+      : accepted ? 'ok' : invalidResponse ? 'invalid_response' : deferred ? 'budget_deferred' : 'ok';
   }
 }
 

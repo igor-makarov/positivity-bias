@@ -28,6 +28,16 @@
     `articleSection` was absent on those pages, matching the policy that missing
     publisher categories stay missing.
 
+22. **Unparseable model output is no longer reported as a healthy rewrite.** When the
+    rewrite model returned JSON that could not be parsed, the refresh kept the originals
+    (correct) but still recorded the snapshot `rewriteStatus` as `ok`, so a silently
+    failing pipeline looked healthy. The run now tracks `invalid_response` and reports
+    that status when nothing was accepted; originals are preserved and no rejection is
+    cached, so the articles are retried on the next refresh. `npm run test:pipeline`
+    seeds a mock that returns unparseable output and asserts the honest status, zero
+    verification calls and untouched originals; the assertion was shown to fail (`ok`)
+    against the pre-fix status logic and pass after it.
+
 ## Verified (2026-10-13, iteration 2-9)
 
 19. **Clef factual-verification call was fundamentally wrong and is now fixed.**
@@ -220,11 +230,13 @@
 
 Latest full validation (iteration 2-10): `npm run check`, **55 unit tests**,
 `npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
-`npm run test:pipeline` (mock model end-to-end + retire/reprocess), `npm run test:batch`
+`npm run test:pipeline` (mock model end-to-end, retire/reprocess and honest
+invalid-response status), `npm run test:batch`
 (validator-window splitting, budget-aware reduction and the documented clef decision
 schema), `npm run test:browser` and `npm run test:interaction` all pass. The new
 confident-yes boundary regression was shown to fail against the previous `0.5` boundary
-and pass after the fix.
+and pass after the fix, and the invalid-response assertion was shown to fail (`ok`)
+against the pre-fix status logic and pass after it.
 
 Live re-check (iteration 2-9): four live ynet article pages and two live mako article
 pages extracted `complete` bodies (1,872–7,620 chars, one truncated at the 6,000-char
