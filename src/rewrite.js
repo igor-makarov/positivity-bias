@@ -253,12 +253,32 @@ export async function rewriteBatch(items, env, { model = env.REWRITE_MODEL || DE
   let payload, usage;
   try { ({ payload, usage } = await runModel(env, model, EDITORIAL_PROMPT, user, maxTokens ?? OUTPUT_TOKENS_PER_ITEM * items.length + 32, schema)); }
   catch { return { candidates: [], evaluated: new Set(), status: 'provider_unavailable', usage: null }; }
-  const document = parseJsonObject(payload);
   const choices = payload?.choices ?? payload?.result?.choices ?? payload?.response?.choices;
   const finishReason = ['stop', 'length', 'content_filter'].includes(choices?.[0]?.finish_reason) ? choices[0].finish_reason : null;
+  const message = choices?.[0]?.message;
+  let document = parseJsonObject(payload);
+  // Qwen's reasoning parser can place a constrained JSON completion entirely in
+  // reasoning_content, leaving content empty. Accept only a normally completed,
+  // WHOLE schema document there, never prose, a substring, or truncated reasoning.
+  // These are still only candidates: identity guards and Clef verification apply.
+  let responseChannel = 'content';
+  if (!Array.isArray(document?.items) && finishReason === 'stop' && !(typeof message?.content === 'string' && message.content.trim())
+    && typeof message?.reasoning_content === 'string') {
+    try {
+      const structured = JSON.parse(message.reasoning_content.trim());
+      if (Array.isArray(structured?.items) && structured.items.length === items.length
+        && structured.items.every((item) => item && Object.keys(item).every((key) => ['id', 'headline', 'usable'].includes(key))
+          && typeof item.id === 'string' && typeof item.headline === 'string' && typeof item.usable === 'boolean')) {
+        document = structured; responseChannel = 'structured_json';
+      }
+    } catch { /* A reasoning-only response is not a final schema document. */ }
+  }
+  const envelope = { responseChannel,
+    contentChars: typeof message?.content === 'string' ? message.content.length : 0,
+    reasoningChars: typeof message?.reasoning_content === 'string' ? message.reasoning_content.length : 0 };
   const outputShape = Array.isArray(document) ? 'array' : document && typeof document === 'object' ? 'object' : 'unparseable';
   const returnedItems = Array.isArray(document?.items) ? document.items.length : 0;
-  if (!Array.isArray(document?.items)) return { candidates: [], evaluated: new Set(), status: 'invalid_response', usage, finishReason, outputShape, returnedItems };
+  if (!Array.isArray(document?.items)) return { candidates: [], evaluated: new Set(), status: 'invalid_response', usage, finishReason, outputShape, returnedItems, envelope };
   const candidates = [];
   // `evaluated` tracks the articles the model actually answered for (exactly one item
   // per stable id). An id absent here is a model omission, not a rejection decision, so
@@ -273,7 +293,7 @@ export async function rewriteBatch(items, env, { model = env.REWRITE_MODEL || DE
     const headline = acceptRewrite(item, matches[0]);
     if (headline) candidates.push({ ...item, headline });
   }
-  return { candidates, evaluated, status: candidates.length === items.length ? 'ok' : candidates.length ? 'partial' : 'rejected', usage, finishReason, outputShape, returnedItems };
+  return { candidates, evaluated, status: candidates.length === items.length ? 'ok' : candidates.length ? 'partial' : 'rejected', usage, finishReason, outputShape, returnedItems, envelope };
 }
 
 // Verifies candidates with the factual-consistency decision model. A candidate is

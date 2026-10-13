@@ -137,7 +137,7 @@ export class NewsStore {
     const diagnostics = snapshot.rewriteDiagnostics = {
       contextCandidates: 0, contextUsable: 0, rewriteCalls: 0, validatorBatches: 0,
       answered: 0, proposed: 0, verified: 0, accepted: 0, failureStage: null, finishReason: null,
-      outputShape: null, returnedItems: 0
+      outputShape: null, returnedItems: 0, contentChars: 0, reasoningChars: 0, responseChannel: null
     };
     const fingerprint = policyFingerprint(this.env);
     const model = this.env.REWRITE_MODEL || DEFAULT_REWRITE_MODEL;
@@ -190,6 +190,9 @@ export class NewsStore {
       diagnostics.proposed += rewrite.candidates.length;
       diagnostics.returnedItems += rewrite.returnedItems ?? 0;
       if (rewrite.outputShape) diagnostics.outputShape = rewrite.outputShape;
+      diagnostics.contentChars += rewrite.envelope?.contentChars ?? 0;
+      diagnostics.reasoningChars += rewrite.envelope?.reasoningChars ?? 0;
+      if (rewrite.envelope?.responseChannel) diagnostics.responseChannel = rewrite.envelope.responseChannel;
       if (rewrite.finishReason) diagnostics.finishReason = rewrite.finishReason;
       if (rewrite.status === 'invalid_response' || (rewrite.evaluated?.size ?? 0) === 0) diagnostics.failureStage = 'rewrite';
       if (rewrite.status === 'invalid_response') invalidResponse = true;

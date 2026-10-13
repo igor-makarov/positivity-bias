@@ -210,6 +210,22 @@ test('Native structured output uses short ids and restores original article iden
   assert.equal(response.returnedItems, 2);
 });
 
+test('A completed whole schema document in the native alternate channel remains a candidate', async () => {
+  const content = JSON.stringify({ items: [{ id: '0', headline: 'לפי המשטרה, 3 בני אדם נפצעו באירוע', usable: true }] });
+  const envelope = (reasoning, finish = 'stop', answer = '') => ({ AI: { run: async () => ({ choices: [{ finish_reason: finish,
+    message: { content: answer, reasoning_content: reasoning } }] }) } });
+  const valid = await rewriteBatch([base], envelope(content));
+  assert.equal(valid.candidates.length, 1);
+  assert.equal(valid.candidates[0].id, base.id);
+  assert.equal(valid.envelope.responseChannel, 'structured_json');
+  assert.equal(valid.payload, undefined);
+  // Prose with embedded JSON, partial reasoning and a truncated completion are never answers.
+  for (const invalid of [envelope('Here is my analysis: ' + content), envelope(content, 'length'),
+    envelope('{"items":['), envelope(content, 'stop', 'A non-JSON final answer')]) {
+    assert.equal((await rewriteBatch([base], invalid)).candidates.length, 0);
+  }
+});
+
 test('The expensive non-Flash validator cannot make a native call', async () => {
   const env = { AI: { run: async () => { assert.fail('Non-Flash validation must not run'); } } };
   const response = await verifyBatch([{ ...base, headline: base.originalHeadline }], env, { model: '@cf/cloudflare/clef' });

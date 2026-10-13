@@ -32,7 +32,9 @@ function createMockAI(validatorModel, rewriteMode, validatorMode) {
     // `choices[].message.content` (with a thinking channel), the older Llama shape under
     // `response`. This keeps the default-model path honest instead of assuming one shape.
     const envelope = (content) => /qwen3/i.test(model)
-      ? { choices: [{ message: { content: THINK_OPEN + 'חשיבה על {הטיוטה} ' + THINK_CLOSE + content, reasoning_content: 'חשיבה' } }], usage: { prompt_tokens: 1200, completion_tokens: 120 } }
+      ? { choices: [{ finish_reason: 'stop', message: rewriteMode === 'partial'
+        ? { content: THINK_OPEN + 'חשיבה על {הטיוטה} ' + THINK_CLOSE + content }
+        : { content: '', reasoning_content: content } }], usage: { prompt_tokens: 1200, completion_tokens: 120 } }
       : { response: content };
     // A model that returns unparseable output must be surfaced, not reported as ok.
     if (rewriteMode === 'invalid') return envelope('not json');
