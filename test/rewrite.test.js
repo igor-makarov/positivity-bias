@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { acceptRewrite, DEFAULT_REWRITE_MODEL, EDITORIAL_PROMPT, VERIFICATION_PROMPT, parseJsonObject, parseModelText, rewriteBatch, verifyBatch } from '../src/rewrite.js';
 import { DEFAULT_VALIDATOR_MODEL } from '../src/policy.js';
+import { OUTPUT_TOKENS_PER_ITEM } from '../src/budget.js';
 
 const base = { id: 'story-1', sourceName: 'ynet', publishedAt: '2026-10-13T11:00:00Z',
   originalHeadline: 'לפי המשטרה: 3 בני אדם נפצעו באירוע',
@@ -121,6 +122,21 @@ test('A structured rewrite response accepts only requested, validated items and 
   assert.equal(response.candidates.length, 1);
   assert.equal(response.candidates[0].headline, 'לפי המשטרה, 3 בני אדם נפצעו באירוע');
 });
+test('Rewrite and verification reserve one complete short output per article', async () => {
+  const items = [base, { ...base, id: 'story-2' }];
+  const rewriteEnv = { AI: { run: async (model, input) => {
+    assert.equal(input.max_tokens, OUTPUT_TOKENS_PER_ITEM * items.length + 32);
+    return { response: JSON.stringify({ items: items.map((item) => ({ id: item.id, usable: true, headline: 'לפי המשטרה, 3 בני אדם נפצעו באירוע' })) }) };
+  } } };
+  const { candidates } = await rewriteBatch(items, rewriteEnv);
+  assert.equal(candidates.length, 2);
+  const verifyEnv = { AI: { run: async (model, input) => {
+    assert.equal(input.max_tokens, OUTPUT_TOKENS_PER_ITEM * candidates.length + 32);
+    return { response: JSON.stringify({ items: candidates.map((item) => ({ id: item.id, supported: true, preserved: true })) }) };
+  } } };
+  assert.equal((await verifyBatch(candidates, verifyEnv)).accepted.size, 2);
+});
+
 test('Malformed or duplicate model items fall back cleanly', async () => {
   assert.equal((await rewriteBatch([base], { AI: { run: async () => ({ response: 'not json' }) } })).status, 'invalid_response');
   const duplicate = await rewriteBatch([base], { AI: { run: async () => ({ response: { items: [result('לפי המשטרה, 3 בני אדם נפצעו באירוע'), result('לפי המשטרה, 3 בני אדם נפצעו באירוע')] } }) } });

@@ -14,6 +14,7 @@
     "test:extract": "node scripts/extraction-check.js",
     "test:retirement": "node scripts/retirement-check.js",
     "test:pipeline": "node scripts/pipeline-check.js",
+    "test:batch": "node scripts/batch-check.js",
     "test:browser": "node scripts/browser-check.js"
   },
   "dependencies": { "fast-xml-parser": "5.11.2" },

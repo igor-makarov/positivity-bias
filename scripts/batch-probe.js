@@ -34,6 +34,7 @@ export class BatchStore extends NewsStore {
       const result = await this.refresh();
       return Response.json({ result, calls: mock.calls });
     }
+    if (url.pathname === '/usage') return Response.json({ used: this.readUsage(url.searchParams.get('day') || this.usageDay()) });
     return super.fetch(request);
   }
 }
