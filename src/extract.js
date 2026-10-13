@@ -1,4 +1,4 @@
-import { articleMetadata, plainText } from './news.js';
+import { articleMetadata, plainText } from './text.js';
 
 export const DEFAULT_CONTEXT_CHARS = 6_000;
 

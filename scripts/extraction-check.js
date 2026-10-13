@@ -1,11 +1,18 @@
 // Workerd-level check of the full-text extraction policy. Plain Node has no
-// HTMLRewriter, so this runs the real module inside Miniflare.
+// HTMLRewriter, so the probe is bundled with esbuild and run inside Miniflare.
 import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 
+// The bundle must live under the working directory so workerd resolves it.
+const directory = await mkdtemp(join(process.cwd(), '.extract-probe-'));
+const outfile = join(directory, 'probe.js');
+await build({ entryPoints: ['scripts/extract-probe.js'], bundle: true, format: 'esm', platform: 'neutral', target: 'es2022', outfile });
+
 const mf = new Miniflare(convertV4MiniflareOptions({
-  cf: false, name: 'extract-probe', scriptPath: 'scripts/extract-probe.js', modules: true, modulesRoot: '.',
-  compatibilityDate: '2026-10-13'
+  cf: false, name: 'extract-probe', scriptPath: outfile, modules: true, compatibilityDate: '2026-10-13'
 }));
 
 try {
@@ -20,4 +27,4 @@ try {
     assert.ok(!data.body.includes(noise), `noise leaked into context: ${noise}`);
   }
   console.log('Extraction passed: article body kept, navigation/advertising/related/footer removed, JSON-LD metadata read.');
-} finally { await mf.dispose(); }
+} finally { await mf.dispose(); await rm(directory, { recursive: true, force: true }); }

@@ -1,4 +1,4 @@
-import { plainText } from './news.js';
+import { plainText } from './text.js';
 import { estimateNeurons } from './budget.js';
 import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, CHEAP_MODELS } from './policy.js';
 
