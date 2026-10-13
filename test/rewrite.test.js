@@ -289,6 +289,18 @@ test('Model responses are parsed across documented envelope shapes', () => {
   assert.deepEqual(parseJsonObject('sure: {"items":[{"id":"1"}]} thanks'), { items: [{ id: '1' }] });
   assert.equal(parseJsonObject('no json here'), null);
 });
+
+test('A truncated native Qwen response is identified without retaining its content', async () => {
+  const env = { AI: { run: async () => ({ choices: [{ finish_reason: 'length',
+    message: { content: '{"items":[' } }], usage: { prompt_tokens: 1000, completion_tokens: 180 } }) } };
+  const response = await rewriteBatch([base], env);
+  assert.equal(response.status, 'invalid_response');
+  assert.equal(response.finishReason, 'length');
+  assert.equal(response.evaluated.size, 0);
+  assert.equal(response.candidates.length, 0);
+  assert.ok(response.usage > 0);
+  assert.equal(response.payload, undefined);
+});
 test('Qwen3 chat envelopes resolve under top-level, result and response wrappers', () => {
   const content = JSON.stringify({ items: [{ id: 'story-1', headline: 'לפי המשטרה, 3 בני אדם נפצעו באירוע', usable: true }] });
   assert.equal(parseModelText({ choices: [{ message: { content, reasoning_content: 'מחשבה' } }] }), content);

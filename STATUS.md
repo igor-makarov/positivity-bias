@@ -4,8 +4,19 @@
   news-sitemap adapters; category/source rotation; hourly ingestion; SQLite Durable
   Object storage; guarded Workers AI rewrites with originals preserved.
 - Chosen name: **במבט**. English subtitle removed from the visible header/logo.
-- Sessions/control are on `shurik-control/main`; iterations continue immediately
-  (`wait-seconds: 0`), with a separate hourly Codex checkup.
+- Sessions/control are on `shurik-control/main`. The user stopped Shurik and the
+  hourly Codex checkup on 2026-10-13; both remain stopped.
+
+## Live-site repair (2026-10-13)
+
+- Fixed the refresh timing defect: readers and cron now share the same minute-7
+  hourly window, so an off-tick reader refresh cannot suppress the next cron.
+  Failed attempts still cannot cause repeated visitor inference in one window.
+- `/api/status` adds bounded rewrite counters, the failing pipeline stage and the
+  native completion reason, without prompts, article bodies or raw model responses.
+- Verified: 69 unit tests, syntax/registry checks, dry-run build, Worker smoke check
+  and mocked end-to-end rewrite/verification/budget pipeline. Production verification
+  follows deployment; this does not yet establish successful live inference.
 
 ## Verified (2026-10-13, iteration 2-17)
 

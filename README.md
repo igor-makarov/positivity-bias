@@ -56,8 +56,9 @@ Use the existing **Cloudflare Workers Builds** connection to `main`:
 The SQLite Durable Object binding and migration are declared in Wrangler and are
 created by deployment. No manual D1/KV database IDs are needed. The Worker refreshes
 at minute 7 each hour (Cloudflare cron is UTC); public dates use Asia/Jerusalem.
-The same Durable Object serializes refreshes and persists an hourly cooldown,
-including after failures, so public reads cannot cause unbounded model usage.
+The same Durable Object serializes refreshes and persists one attempt per hourly
+window aligned with the minute-7 cron, including after failures. A reader refresh
+between ticks cannot suppress the next scheduled tick or cause a request storm.
 
 This environment did not have Cloudflare account access, so the existing dashboard
 commands and deployed URL could not be inspected. `npm run deploy` requires
@@ -153,7 +154,8 @@ keep credentials only in secrets.
 
 - `/api/news`: `q`, `source`, exact `category`, `order=broad|latest`, `limit` (1–120),
   `offset`; includes category options, source states, freshness and original titles.
-- `/api/status`: source/freshness/rewrite status. No key values or provider responses.
+- `/api/status`: source/freshness/rewrite status and bounded rewrite counters, failure
+  stage and completion reason. No article bodies, key values or provider responses.
 - No public refresh/admin endpoint. Cron invokes the internal Durable Object.
 - A failed source does not replace the last successful articles; old articles expire
   after 72 hours. Stale or partial coverage is visible in the interface.

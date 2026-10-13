@@ -72,6 +72,9 @@ try {
   assert.equal(defaultRun.calls.rewrite, 1);
   assert.deepEqual(defaultRun.calls.models, ['@cf/qwen/qwen3-30b-a3b-fp8']); // the code default, not the removed Llama slug
   const defaultSnapshot = await (await defaultStore.fetch('https://news.internal/snapshot')).json();
+  assert.equal(defaultSnapshot.rewriteDiagnostics.failureStage, null);
+  assert.ok(defaultSnapshot.rewriteDiagnostics.answered > 0);
+  assert.equal(defaultSnapshot.rewriteDiagnostics.accepted, 1);
   const defaultAccepted = defaultSnapshot.articles.find((article) => article.originalHeadline === 'לפי המועצה: 3 תוכניות אושרו');
   assert.equal(defaultAccepted.rewriteStatus, 'rewritten');
   assert.equal(defaultAccepted.headline, 'לפי המועצה אושרו 3 תוכניות');
@@ -108,6 +111,8 @@ try {
   assert.ok(invalid.calls.rewrite > 0);
   assert.equal(invalid.calls.verify, 0); // nothing to verify without a parsed candidate
   const invalidServed = await (await invalidStore.fetch('https://news.internal/snapshot')).json();
+  assert.equal(invalidServed.rewriteDiagnostics.failureStage, 'rewrite');
+  assert.equal(invalidServed.rewriteDiagnostics.answered, 0);
   assert.ok(invalidServed.articles.length > 0);
   assert.ok(invalidServed.articles.every((article) => article.headline === article.originalHeadline)); // originals preserved
   assert.ok(invalidServed.articles.every((article) => article.rewriteStatus !== 'rewritten')); // and not cached as trusted
@@ -182,6 +187,10 @@ try {
   const badValidator = await (await badValidatorStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: badValidatorSeed, env: badValidatorEnv }) })).json();
   assert.equal(badValidator.result.state, 'complete');
   assert.equal(badValidator.result.rewriteStatus, 'invalid_response');
+  const badValidatorSnapshot = await (await badValidatorStore.fetch('https://news.internal/snapshot')).json();
+  assert.equal(badValidatorSnapshot.rewriteDiagnostics.failureStage, 'verification');
+  assert.ok(badValidatorSnapshot.rewriteDiagnostics.proposed > 0);
+  assert.equal(badValidatorSnapshot.rewriteDiagnostics.verified, 0);
   assert.ok(badValidator.calls.rewrite > 0);
   assert.ok(badValidator.calls.verify > 0); // the verification was attempted, it just decided nothing
   const badServed = await (await badValidatorStore.fetch('https://news.internal/snapshot')).json();

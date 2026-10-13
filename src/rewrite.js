@@ -240,7 +240,9 @@ export async function rewriteBatch(items, env, { model = env.REWRITE_MODEL || DE
   try { ({ payload, usage } = await runModel(env, model, EDITORIAL_PROMPT, user, maxTokens ?? OUTPUT_TOKENS_PER_ITEM * items.length + 32)); }
   catch { return { candidates: [], evaluated: new Set(), status: 'provider_unavailable', usage: null }; }
   const document = parseJsonObject(payload);
-  if (!Array.isArray(document?.items)) return { candidates: [], evaluated: new Set(), status: 'invalid_response', usage };
+  const choices = payload?.choices ?? payload?.result?.choices ?? payload?.response?.choices;
+  const finishReason = ['stop', 'length', 'content_filter'].includes(choices?.[0]?.finish_reason) ? choices[0].finish_reason : null;
+  if (!Array.isArray(document?.items)) return { candidates: [], evaluated: new Set(), status: 'invalid_response', usage, finishReason };
   const candidates = [];
   // `evaluated` tracks the articles the model actually answered for (exactly one item
   // per stable id). An id absent here is a model omission, not a rejection decision, so
@@ -253,7 +255,7 @@ export async function rewriteBatch(items, env, { model = env.REWRITE_MODEL || DE
     const headline = acceptRewrite(item, matches[0]);
     if (headline) candidates.push({ ...item, headline });
   }
-  return { candidates, evaluated, status: candidates.length === items.length ? 'ok' : candidates.length ? 'partial' : 'rejected', usage };
+  return { candidates, evaluated, status: candidates.length === items.length ? 'ok' : candidates.length ? 'partial' : 'rejected', usage, finishReason };
 }
 
 // Verifies candidates with the factual-consistency decision model. A candidate is

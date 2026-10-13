@@ -5,9 +5,9 @@ import { DEFAULT_CONTEXT_CHARS } from './extract.js';
 import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, needsRewrite, policyFingerprint, retireStaleRewrites, sourceFingerprint } from './policy.js';
 import { rewriteBatch, verifyBatch } from './rewrite.js';
 import { budgetDecision, dailyNeuronBudget, estimateBatchNeurons, fitBatchToBudget, planBatches, requestContextTokens, SHARED_RESERVED_TOKENS_PER_ITEM } from './budget.js';
+import { HOUR, refreshDue } from './refresh.js';
 
 const sources = validateWebsites(configuration);
-const HOUR = 3_600_000;
 
 const json = (body, status = 200) => Response.json(body, { status, headers: {
   'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
@@ -85,7 +85,7 @@ export class NewsStore {
     if (path === '/refresh' && request.method === 'POST') return json(await this.refresh());
     if (request.method !== 'GET' || path !== '/snapshot') return json({ error: 'not_found' }, 404);
     const snapshot = this.readSnapshot();
-    if (!snapshot.lastAttemptAt || Date.now() - Date.parse(snapshot.lastAttemptAt) >= HOUR) {
+    if (refreshDue(snapshot.lastAttemptAt)) {
       this.state.waitUntil(this.refresh());
     }
     return json(snapshot);
@@ -105,7 +105,7 @@ export class NewsStore {
   async performRefresh() {
     const previous = this.readSnapshot();
     const now = Date.now();
-    if (previous.lastAttemptAt && now - Date.parse(previous.lastAttemptAt) < HOUR - 30_000) return { state: 'cooldown' };
+    if (!refreshDue(previous.lastAttemptAt, now)) return { state: 'cooldown' };
     // Persist the attempt before network work so failed refreshes cannot create request storms.
     const snapshot = { ...previous, lastAttemptAt: new Date(now).toISOString() };
     this.writeSnapshot(snapshot);
@@ -130,6 +130,10 @@ export class NewsStore {
   // remaining daily neuron budget. Batches never truncate article context to fit
   // more articles; work is deferred instead when budget or context is insufficient.
   async rewritePending(snapshot, now) {
+    const diagnostics = snapshot.rewriteDiagnostics = {
+      contextCandidates: 0, contextUsable: 0, rewriteCalls: 0, validatorBatches: 0,
+      answered: 0, proposed: 0, verified: 0, accepted: 0, failureStage: null, finishReason: null
+    };
     const fingerprint = policyFingerprint(this.env);
     const model = this.env.REWRITE_MODEL || DEFAULT_REWRITE_MODEL;
     const validator = this.env.VALIDATOR_MODEL || DEFAULT_VALIDATOR_MODEL;
@@ -137,6 +141,7 @@ export class NewsStore {
     const chars = contextChars(this.env);
     const pending = coverageOrder(snapshot.articles.filter((article) => needsRewrite(article, fingerprint)))
       .slice(0, maxContextFetches(this.env));
+    diagnostics.contextCandidates = pending.length;
     if (!pending.length) { snapshot.rewriteStatus = 'ok'; return; }
     // Fetch accessible article text once, bounded, so each request is sized from the
     // actual full-text input instead of a worst-case length. Missing context is not
@@ -147,6 +152,7 @@ export class NewsStore {
       return { article, ...(await loadArticleContext(article, source, fetch, { maxChars: chars })) };
     }));
     const usable = prepared.filter((entry) => entry.context.text && entry.context.completeness !== 'missing');
+    diagnostics.contextUsable = usable.length;
     if (!usable.length) { snapshot.rewriteStatus = 'context_unavailable'; return; }
     // The same context goes to the rewrite model and the validator, so a request may
     // only be as large as the smaller of their context windows.
@@ -174,6 +180,11 @@ export class NewsStore {
         originalHeadline: article.originalHeadline, publishedAt: article.publishedAt,
         context, contextCompleteness: completeness }));
       const rewrite = await rewriteBatch(items, this.env, { model });
+      diagnostics.rewriteCalls++;
+      diagnostics.answered += rewrite.evaluated?.size ?? 0;
+      diagnostics.proposed += rewrite.candidates.length;
+      if (rewrite.finishReason) diagnostics.finishReason = rewrite.finishReason;
+      if (rewrite.status === 'invalid_response' || (rewrite.evaluated?.size ?? 0) === 0) diagnostics.failureStage = 'rewrite';
       if (rewrite.status === 'invalid_response') invalidResponse = true;
       // A parseable response that answered none of the requested articles is a failed
       // rewrite, not a healthy one: surface it instead of reporting `ok`.
@@ -188,6 +199,10 @@ export class NewsStore {
       const verified = rewrite.candidates.length
         ? await verifyBatch(rewrite.candidates, this.env, { model: validator })
         : { accepted: new Map(), rejected: new Set(), evaluated: new Set(), usage: null, status: 'rejected' };
+      if (rewrite.candidates.length) diagnostics.validatorBatches++;
+      diagnostics.verified += verified.evaluated?.size ?? 0;
+      diagnostics.accepted += verified.accepted.size;
+      if (rewrite.candidates.length && (verified.evaluated?.size ?? 0) === 0) diagnostics.failureStage = 'verification';
       if (verified.usage != null) spent = (spent ?? 0) + verified.usage;
       this.reconcileUsage(day, estimate, spent ?? estimate);
       // A clef response that decided NONE of the submitted candidates is a failed
@@ -239,7 +254,7 @@ export default {
       const publicStatus = { updatedAt: rest.updatedAt, lastAttemptAt: rest.lastAttemptAt,
         rewriteStatus: rest.rewriteStatus, sources: rest.sources,
         stale: !rest.updatedAt || Date.now() - Date.parse(rest.updatedAt) > 2 * HOUR };
-      if (url.pathname === '/api/status') return json(publicStatus);
+      if (url.pathname === '/api/status') return json({ ...publicStatus, rewriteDiagnostics: rest.rewriteDiagnostics ?? null });
       const query = (url.searchParams.get('q') || '').trim().slice(0, 120).toLocaleLowerCase('he');
       const category = url.searchParams.get('category'), source = url.searchParams.get('source');
       let selected = articles.filter((article) => (!category || (article.categories || []).includes(category))
