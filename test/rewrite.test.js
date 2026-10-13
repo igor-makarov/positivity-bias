@@ -100,6 +100,21 @@ test('Cross-article independence: one rejected candidate does not affect a valid
   assert.equal(status, 'partial');
 });
 
+test('Cross-article fact mixing is rejected: a sibling headline cannot move to the wrong article', async () => {
+  const a = { id: 'mix-a', sourceName: 'ynet', publishedAt: '2026-10-13T11:00:00Z',
+    originalHeadline: 'לפי המשטרה: 3 בני אדם נפצעו באירוע', context: 'לפי המשטרה, 3 בני אדם נפצעו באירוע.', contextCompleteness: 'complete' };
+  const b = { id: 'mix-b', sourceName: 'mako', publishedAt: '2026-10-13T11:00:00Z',
+    originalHeadline: 'המועצה אישרה 7 תוכניות חדשות', context: 'המועצה אישרה 7 תוכניות חדשות.', contextCompleteness: 'complete' };
+  const env = { AI: { run: async (model, input) => {
+    assert.deepEqual(JSON.parse(input.messages[1].content).map((item) => item.id), ['mix-a', 'mix-b']); // stable boundaries
+    return { response: JSON.stringify({ items: [
+      { id: 'mix-a', headline: 'המועצה אישרה 7 תוכניות חדשות', usable: true },
+      { id: 'mix-b', headline: 'לפי המשטרה, 3 בני אדם נפצעו באירוע', usable: true }
+    ] }) };
+  } } };
+  assert.equal((await rewriteBatch([a, b], env)).candidates.length, 0); // each headline is checked against its own source
+});
+
 test('No AI binding means original fallback', async () => {
   assert.equal((await rewriteBatch([base], {})).status, 'not_configured');
   assert.equal((await verifyBatch([base], {})).status, 'not_configured');

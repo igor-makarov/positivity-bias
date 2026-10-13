@@ -38,6 +38,8 @@ test('Requests are limited by the smaller of the rewrite and validator context w
   assert.equal(requestContextTokens(['@cf/meta/llama-3.1-8b-instruct-fp8-fast', '@cf/cloudflare/clef-flash']), 32_768);
   assert.equal(requestContextTokens(['@cf/meta/llama-3.2-1b-instruct']), 128_000);
   assert.equal(requestContextTokens(['@cf/unknown/model']), 32_768); // conservative default
+  assert.equal(requestContextTokens(['@cf/meta/llama-3.1-8b-instruct-fp8-fast', '@cf/unknown/model']), 32_768); // unknown peer stays conservative
+  assert.equal(requestContextTokens([]), 32_768);
   const items = Array.from({ length: 20 }, (_, index) => ({ id: `a${index}`, contextLength: 6000 }));
   const rewriteOnly = planBatches(items, { model: '@cf/meta/llama-3.1-8b-instruct-fp8-fast' });
   const shared = planBatches(items, { model: '@cf/meta/llama-3.1-8b-instruct-fp8-fast',

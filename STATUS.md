@@ -59,10 +59,11 @@
    so neither inference is repeated for unchanged articles.
 5. **Regressions.** Exact reported success→failure reversal (heuristic + Clef
    rejection), the Karmiel/Dimona material-context case (omitted speakers fail;
-   faithful rewrite accepted), cross-article independence, and stale-cache
-   retirement are all covered.
+   faithful rewrite accepted), cross-article independence, cross-article fact mixing
+   on both the rewrite and verification paths, and stale-cache retirement are all
+   covered.
 
-Validation this iteration: `npm run check`, **43 unit tests**, `npm run build`,
+Validation this iteration: `npm run check`, **44 unit tests**, `npm run build`,
 `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
 `npm run test:pipeline` (mock model end-to-end), `npm run test:batch` (validator-window
 splitting) and `npm run test:browser` all pass.

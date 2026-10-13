@@ -37,11 +37,12 @@ export function budgetDecision(used, estimate, budget) {
 }
 
 // The shared article context is sent to BOTH the rewrite model and the validator, so
-// a request may only be as large as the smallest context window in the pair. Returns
-// the most restrictive documented window, with a conservative default for unknowns.
+// a request may only be as large as the smallest context window in the pair. Every
+// model contributes its documented window, or the conservative default when unknown,
+// and the most restrictive result wins.
 export function requestContextTokens(models = []) {
-  const windows = models.map((model) => MODEL_CONTEXT_TOKENS[model]).filter((value) => Number.isFinite(value));
-  return windows.length ? Math.min(...windows) : 32_768;
+  if (!models.length) return 32_768;
+  return Math.min(...models.map((model) => MODEL_CONTEXT_TOKENS[model] || 32_768));
 }
 
 // Split pending articles into requests that fit the model context window and a
