@@ -57,8 +57,10 @@ Validation at handoff plus this iteration: `npm run check`, all 21 unit tests,
    parallel deployment.
 3. **Deployed `/api/status` and `/api/news` smoke checks pending** the verified URL.
    Workers AI Hebrew quality, the native `AI` binding, JSON response shape, and real
-   neuron use are unverified (no deployment). Keep the 8-attempt/hour, 1024-token,
-   cheap-model-allowlist limits; prefer honest originals on failure.
+   neuron use are unverified (no deployment). Offline probe: Miniflare's local `AI`
+   binding reports `provider_unavailable` and the refresh still completes with
+   originals preserved, confirming the fallback path. Keep the 8-attempt/hour,
+   1024-token, cheap-model-allowlist limits; prefer honest originals on failure.
 5. Factual-headline validation can still be strengthened with observed rewrite errors
    once live inference is reachable (names/quotes/causal claims are not yet guarded).
 
