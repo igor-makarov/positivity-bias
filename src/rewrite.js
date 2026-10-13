@@ -20,15 +20,23 @@ function numberTokens(value) {
   return [...new Set(value.match(/\d+(?:[.,]\d+)*(?:%|‰)?/g) || [])];
 }
 
+// Clearly sensational or clickbait Hebrew that a dry rewrite must never introduce.
+// A term already present in the source text is not treated as newly added drama; the
+// existing numeric/attribution/uncertainty guards cover those cases.
+const SENSATIONAL = [/הלם/u, /מזעזע/u, /לא תאמינ/u, /קשה להאמין/u, /מדהימ/u, /שערוריי/u,
+  /סנסציי/u, /דרמטי/u, /בלתי נתפס/u, /בלתי יאומן/u, /אסור לפספס/u, /חובה לראות/u, /אי אפשר להתעלם/u];
+
 export function acceptRewrite(item, result) {
   if (result?.usable !== true || typeof result.headline !== 'string') return null;
   const headline = plainText(result.headline, 300);
-  if (!headline || headline.length > 180 || !/[\u05d0-\u05ea]/.test(headline) || /[!<>]|https?:|\p{Extended_Pictographic}/u.test(headline)) return null;
+  if (!headline || headline.length > 180 || !/[\u05d0-\u05ea]/.test(headline) || /[!?<>]|https?:|\p{Extended_Pictographic}/u.test(headline)) return null;
   const supportedNumbers = numberTokens(`${item.originalHeadline} ${item.description}`);
   if (numberTokens(headline).some((number) => !supportedNumbers.includes(number))) return null;
   if (numberTokens(item.originalHeadline).some((number) => !numberTokens(headline).includes(number))) return null;
   const uncertainty = [/חשד|חשוד|חשודה|חשודים|לכאורה/u, /לפי|לדברי|לטענת|טוען|טוענת|דיווח|דווח|על פי/u, /ייתכן|עשוי|עשויה|עלול|עלולה|אפשרות|הערכה|מעריך|מעריכה/u];
   if (uncertainty.some((pattern) => pattern.test(item.originalHeadline) && !pattern.test(headline))) return null;
+  const sourceText = `${item.originalHeadline} ${item.description}`;
+  if (SENSATIONAL.some((pattern) => pattern.test(headline) && !pattern.test(sourceText))) return null;
   return headline;
 }
 

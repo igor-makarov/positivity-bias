@@ -26,6 +26,8 @@ npm run dev
 npm run check
 npm test
 npm run build
+npm run test:worker   # Miniflare runtime check with fictional fixtures (build first)
+npm run test:browser  # headless Chromium render check (build first, needs Chromium on PATH)
 ```
 
 `build` bundles the Worker with Wrangler's dry run; it does not publish. Live
