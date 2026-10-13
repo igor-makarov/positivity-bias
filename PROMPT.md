@@ -277,3 +277,12 @@ The loop waits at least 3600 seconds after each iteration; Shurik recovery check
 every 15 minutes and resumes when due (GitHub scheduling may delay it). An hourly
 Codex checkup reads this file and can steer priorities. Do not sleep inside an
 iteration or create additional loops, workflows, schedules, or recurring tasks.
+
+Operational evidence (2026-10-13): iteration 1 completed, but its saved due time
+passed without any GitHub scheduled recovery run. The supervisor reran that run's
+existing recovery job, which dispatched iteration 2 (run 38419826476) and it claimed
+the same generation-1 loop. The existing hourly Codex checkup now checks overdue
+continuations and can rerun canonical recovery once only while the loop is enabled,
+ownerless and has no queued/active iteration or recovery. It respects user stops.
+Investigate the missing scheduled recovery when authorized GitHub workflow access
+is available; preserve the existing loop and do not create duplicate schedules.
