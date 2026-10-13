@@ -34,6 +34,53 @@ but the published rewrite says:
 This reverses success into failure. Numeric/keyword guards are insufficient.
 Fix this before cosmetic work or new features, and add this exact regression case.
 
+## Preserve the central point and material context
+
+The user supplied a second screenshot, generated with a 3B model. Its source title:
+"האוכלוסייה בישראל רואה את הצפון כצימר לסופ״ש אבל לא כמקום לגור בו"
+became:
+"ראשי ערים קראו לשינוי דמוגרפי בישראל"
+Relative to the supplied headline, the rewrite loses the central north/tourism
+versus permanent-residence contrast and introduces a demographic-policy framing
+that is not supported by that headline. Do not infer that the full article says
+anything beyond the available evidence; use its accessible body to identify the
+actual speakers, claim, scope and attribution. Add this exact case as a second
+regression, alongside the successful-drone-test reversal.
+
+Both the runtime grounding/editorial prompt AND Clef Flash verification must
+prioritize information preservation, not only factual non-contradiction:
+- Identify the article's primary event/claim and what makes it newsworthy.
+- Preserve the actor/speaker, actual action or claim, geographical/population scope,
+  result, and any essential qualifier, eligibility condition, comparison or contrast.
+- Keep the original news angle when it is supported by the article; do not replace
+  a specific north/residence problem with an abstract national demographic claim.
+- Distinguish an attributed opinion or quoted perception from an established fact.
+  Removing quote marks does not authorize presenting the quotation as fact.
+- Remove sensational tone without erasing the core point. Prioritize these material
+  facts over generic brevity; if a faithful short headline cannot be formed, keep
+  the original rather than an incomplete or misleading rewrite.
+- Do not require every incidental fact or every paragraph in the headline. Select
+  facts whose omission would change the reader's understanding, implications,
+  scope, or apparent actor/action. Never fill gaps with an invented explanation.
+
+Use the full article and original title to ground this selection. If the rewrite
+schema includes essential-fact/evidence fields, generate them in the SAME bounded
+call, keep evidence snippets short/internal, and count them in the daily budget;
+do not add another expensive preprocessing stage or new visible UI fields.
+Clef verification must ask separately whether (1) every asserted claim is supported
+and (2) the primary point and material context are preserved without misleading
+omission, broadening, narrowing or changed emphasis. A merely plausible/entailed
+but incomplete headline must fail the second check. Use the combined existing
+verification request, preserve per-article independence, and fall back to originals
+if either check fails or is uncertain. No quality guarantee follows from model
+size or a passing numeric/keyword guard.
+
+This is part of the urgent editorial correction. Shurik should update the runtime
+prompt, verification questions, regression cases and policy fingerprint together.
+The existing-cache retirement requirement below also covers this new coverage
+policy, so old rewrites cannot bypass it. Preserve adaptive batching, caching, the
+daily Free budget, publisher categories and the chosen במבט branding.
+
 The user requests the complete article text as model context whenever accessible,
 and reiterates LOW COST. Replace the 400-character-excerpt-only inference path:
 extract the actual article body, removing navigation, advertising and unrelated
