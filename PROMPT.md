@@ -55,13 +55,32 @@ successful rewrite and verification results with source-content/policy/model
 fingerprints; do not repeat either inference for visitors. Do not let raw full
 source text leak into public diagnostics.
 
-Keep at most 8 headline attempts/hour and at most 1024 total generation output
-tokens per hourly refresh; split batches for full-text context only within that
-total budget. Bound validator calls as well (one per candidate, no retries).
-Account for both rewrite and Clef Flash input-token neurons against the Free
-account's 10,000/day shared allowance. Reduce work or leave originals when budget
-or quality is insufficient. No billing upgrade, paid-only models, expensive
-fallback, unbounded reasoning, automatic budget increase or new feature work.
+The user explicitly authorizes bigger batches and higher article throughput.
+Replace the arbitrary 8-headline/hour and 1024-total-output-token/hour limits with
+adaptive token-budgeted batching. Size each request from the actual full-text
+input, model context window, reserved output space, and remaining daily neuron
+budget. Reserve enough output tokens for one complete short result per article.
+Do not truncate article context merely to fit more articles into a batch.
+
+Keep stable per-article IDs, clear article boundaries, independent validation,
+and regression tests against cross-article fact mixing and outcome reversal.
+Accept valid results independently; failed/missing/ambiguous items keep originals.
+Split requests when model or validator context/output limits would be exceeded.
+Keep source fetches and batch work bounded to Worker execution/subrequest limits.
+Cache accepted rewrites and validation decisions, process new/changed articles,
+and do not repeat either inference per visitor. Bound validator calls (one per
+candidate, no retries). Larger synchronous batches do not imply discounted token
+pricing; use the documented asynchronous Batch API only if suitable for the
+hourly refresh workflow.
+
+Low cost remains a requirement. Account for rewrite AND Clef Flash input/output
+neurons against the Free account's 10,000/day shared allowance, with conservative
+headroom for other account usage. Persist a daily usage reservation before calls
+so concurrent refreshes/restarts cannot overspend the project budget; reconcile
+with provider-reported usage when available. Reduce batch size or defer work when
+remaining budget/context is insufficient; preserve originals on quota failure.
+No billing upgrade, paid-only models, expensive fallback, unbounded reasoning,
+unbounded retries, automatic increase of the DAILY neuron budget or new features.
 
 Official references:
 - https://developers.cloudflare.com/workers-ai/models/qwen3-30b-a3b-fp8/
@@ -149,10 +168,9 @@ Official references:
 - Production rewriting uses the native Cloudflare Workers AI `AI` binding. No
   inference API key or OCGO key belongs in the Worker. Default model:
   initially `@cf/meta/llama-3.1-8b-instruct-fp8-fast`; evaluate Qwen3 as directed above.
-  Keep a documented cheap-model allowlist, at most
-  8 headline attempts per hourly refresh, 1024 total output tokens per refresh, cached
-  accepted results and fallback on quota/provider failure. The user is on Free:
-  do not upgrade billing, use paid-only models, add retries or raise the cap.
+  Keep a documented cheap-model allowlist, adaptive token-budgeted larger batches,
+  cached accepted results and fallback on quota/provider failure. The user is on Free:
+  do not upgrade billing, use paid-only models, add retries or raise the daily budget.
   Monitor account-wide usage against the 10,000-neuron daily free allocation when
   authorized account access is available. Actual usage and Hebrew quality still
   require validation. Do not expose secrets in files, prompts or journals.
