@@ -7,6 +7,22 @@
 - Sessions/control are on `shurik-control/main`; iterations continue immediately
   (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
+## Verified (2026-10-13, iteration 2-10)
+
+21. **Clef acceptance boundary corrected (uncertain verdicts now keep the original).**
+    The guard accepted a candidate when both `noul` probabilities were `>= 0.5`, so a
+    maximally uncertain 0.5 verdict — and any weak lean-yes — was treated as a confident
+    yes, contradicting the code's own comment and the requirement to keep the original
+    when a check is uncertain. `CLEF_ACCEPT_PROBABILITY` is now `0.7` (documented
+    confident-yes boundary; values at or above it accept, everything lower keeps the
+    preserved original). `VALIDATOR_VERSION` is bumped to `clef-guard-v3` so any rewrite
+    verified under the looser boundary is retired by the existing fingerprint path and
+    reprocessed progressively. The clef request/response contract was re-checked against
+    the live Cloudflare docs (`state` may be structured JSON; `questions` are typed
+    `noul`/`choice`/`score`, 1–64, with `criteria` valid for `noul`; `answers[id].noul` is
+    the probability the answer is yes) — the verifier already matches it. New unit
+    regression fails against the old `0.5` boundary and passes after the fix.
+
 ## Verified (2026-10-13, iteration 2-9)
 
 19. **Clef factual-verification call was fundamentally wrong and is now fixed.**
@@ -197,12 +213,13 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Latest full validation (iteration 2-9): `npm run check`, **54 unit tests**,
+Latest full validation (iteration 2-10): `npm run check`, **55 unit tests**,
 `npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
 `npm run test:pipeline` (mock model end-to-end + retire/reprocess), `npm run test:batch`
 (validator-window splitting, budget-aware reduction and the documented clef decision
-schema), `npm run test:browser` and `npm run test:interaction` all pass. The
-clef-schema regressions were added with the fix. (Iteration 2-5 ran the full battery twice.)
+schema), `npm run test:browser` and `npm run test:interaction` all pass. The new
+confident-yes boundary regression was shown to fail against the previous `0.5` boundary
+and pass after the fix.
 
 Live re-check (iteration 2-9): four live ynet article pages and two live mako article
 pages extracted `complete` bodies (1,872–7,620 chars, one truncated at the 6,000-char

@@ -87,7 +87,8 @@ plus a map of typed `questions`, and returns a probability per question. The ver
 sends two `noul` (yes/no) questions per candidate — is every claim supported by the
 source, and are the primary point and material context preserved without misleading
 omission, broadening, narrowing or changed emphasis? A candidate is accepted only when
-both probabilities are a confident yes; anything unsupported, incomplete or uncertain
+both probabilities are a confident yes (>= `CLEF_ACCEPT_PROBABILITY`, 0.7); a
+weakly-positive or uncertain verdict, like any unsupported or incomplete candidate,
 falls back to the preserved original. Calls are chunked to the documented 64-question
 and 24,576-token limits. Clef is charged for input tokens only.
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { acceptRewrite, CLEF_MAX_CANDIDATES, DEFAULT_REWRITE_MODEL, EDITORIAL_PROMPT, VERIFICATION_PROMPT, VERIFICATION_QUESTIONS, modelUsageNeurons, parseJsonObject, parseModelText, planVerificationBatches, rewriteBatch, verifyBatch } from '../src/rewrite.js';
+import { acceptRewrite, CLEF_ACCEPT_PROBABILITY, CLEF_MAX_CANDIDATES, DEFAULT_REWRITE_MODEL, EDITORIAL_PROMPT, VERIFICATION_PROMPT, VERIFICATION_QUESTIONS, modelUsageNeurons, parseJsonObject, parseModelText, planVerificationBatches, rewriteBatch, verifyBatch } from '../src/rewrite.js';
 import { DEFAULT_VALIDATOR_MODEL } from '../src/policy.js';
 import { OUTPUT_TOKENS_PER_ITEM } from '../src/budget.js';
 
@@ -100,6 +100,18 @@ test('Verification rejects a merely plausible but incomplete or uncertain candid
   ]) {
     assert.equal((await verifyBatch([{ ...periphery, headline: abstractClaim }], clefEnv([verdict]))).accepted.size, 0);
   }
+});
+
+test('Only a confident clef yes accepts; an uncertain verdict keeps the original', async () => {
+  const candidate = { ...drone, headline: 'תעשייה אווירית: ניסוי מוצלח במל״ט עם מקלע' };
+  // The maximally uncertain ~0.5 verdict, and any weakly-positive probability below the
+  // confident boundary, are not a yes: the candidate must keep the preserved original.
+  assert.ok(CLEF_ACCEPT_PROBABILITY > 0.5 && CLEF_ACCEPT_PROBABILITY < 1);
+  for (const probability of [0.5, 0.6, CLEF_ACCEPT_PROBABILITY - 0.01]) {
+    assert.equal((await verifyBatch([candidate], clefEnv([{ supported: probability, preserved: 1 }]))).accepted.size, 0, `supported ${probability} must not accept`);
+    assert.equal((await verifyBatch([candidate], clefEnv([{ supported: 1, preserved: probability }]))).accepted.size, 0, `preserved ${probability} must not accept`);
+  }
+  assert.equal((await verifyBatch([candidate], clefEnv([{ supported: CLEF_ACCEPT_PROBABILITY, preserved: CLEF_ACCEPT_PROBABILITY }]))).accepted.size, 1);
 });
 
 test('Clef answers are parsed only from the documented answers envelope', async () => {

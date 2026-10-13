@@ -64,9 +64,11 @@ export const VERIFICATION_PROMPT = `${VERIFICATION_QUESTIONS.supported.instructi
 export const CLEF_MAX_QUESTIONS = 64;
 export const CLEF_QUESTIONS_PER_CANDIDATE = 2;
 export const CLEF_MAX_CANDIDATES = Math.floor(CLEF_MAX_QUESTIONS / CLEF_QUESTIONS_PER_CANDIDATE);
-// A `noul` answer is the probability that the answer is yes. Anything at or below the
-// boundary (or missing/uncertain) fails the check and keeps the original.
-export const CLEF_ACCEPT_PROBABILITY = 0.5;
+// A `noul` answer is the probability that the answer is yes. The guard is deliberately
+// conservative: only a confident yes accepts the candidate. A weakly-positive
+// probability, the maximally uncertain ~0.5 verdict, a missing answer and anything
+// below the confident boundary all keep the preserved original headline.
+export const CLEF_ACCEPT_PROBABILITY = 0.7;
 
 function clefSelector(model) {
   return /clef-flash/.test(model) ? 'clef-flash' : 'clef';

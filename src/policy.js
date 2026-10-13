@@ -6,7 +6,10 @@ export const EDITORIAL_VERSION = 'editorial-v3';
 export const CONTEXT_POLICY = 'full-text-v2';
 // v2: clef-flash is driven through its documented decision schema (state + typed
 // yes/no questions), not the chat completion shape that its API does not accept.
-export const VALIDATOR_VERSION = 'clef-guard-v2';
+// v3: a candidate is accepted only on a confident yes; a weakly-positive or uncertain
+// probability keeps the preserved original (the previous >=0.5 boundary accepted the
+// maximally uncertain 0.5 verdict).
+export const VALIDATOR_VERSION = 'clef-guard-v3';
 
 export const DEFAULT_REWRITE_MODEL = '@cf/meta/llama-3.1-8b-instruct-fp8-fast';
 export const DEFAULT_VALIDATOR_MODEL = '@cf/cloudflare/clef-flash';
