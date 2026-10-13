@@ -8,15 +8,20 @@ const VALIDATOR = '@cf/cloudflare/clef-flash';
 function createMockAI() {
   const calls = { rewrite: 0, verify: 0, maxVerifyChars: 0, maxRewriteChars: 0 };
   const run = async (model, input) => {
-    const items = JSON.parse(input.messages[1].content);
-    const chars = input.messages[1].content.length;
     if (model === VALIDATOR) {
       calls.verify++;
-      calls.maxVerifyChars = Math.max(calls.maxVerifyChars, chars);
-      return { response: JSON.stringify({ items: items.map((item) => ({ id: item.id, supported: true, preserved: true })) }) };
+      calls.maxVerifyChars = Math.max(calls.maxVerifyChars, JSON.stringify(input).length);
+      // clef answers are `noul` probabilities keyed by the candidate index.
+      const answers = {};
+      input.state.forEach((item, index) => {
+        answers[`${index}_supported`] = { type: 'noul', noul: 1 };
+        answers[`${index}_preserved`] = { type: 'noul', noul: 1 };
+      });
+      return { model: 'clef-flash', answers, usage: { input_tokens: 2000, output_tokens: 0 } };
     }
     calls.rewrite++;
-    calls.maxRewriteChars = Math.max(calls.maxRewriteChars, chars);
+    const items = JSON.parse(input.messages[1].content);
+    calls.maxRewriteChars = Math.max(calls.maxRewriteChars, input.messages[1].content.length);
     // Echo the original headline: a faithful, dry candidate that the heuristics accept.
     return { response: JSON.stringify({ items: items.map((item) => ({ id: item.id, usable: true, headline: item.originalHeadline })) }) };
   };

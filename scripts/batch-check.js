@@ -80,13 +80,18 @@ try {
     env: { REWRITE_MODEL: '@cf/meta/llama-3.1-8b-instruct-fp8-fast', VALIDATOR_MODEL: '@cf/cloudflare/clef-flash',
       DAILY_NEURON_BUDGET: '60', CONTEXT_CHARS: '6000', MAX_CONTEXT_FETCHES: '20' } }) })).json();
   assert.equal(partial.result.state, 'complete');
-  assert.equal(partial.calls.rewrite, 1); // one article fits the 60-neuron budget; the rest defer
-  assert.equal(partial.calls.verify, 1);
+  // The 60-neuron budget cannot cover all nine articles at once, but the first planned
+  // batch is REDUCED to what fits instead of deferring every article in it. Reporting
+  // provider usage lets the ledger free headroom, so a small prefix still gets through.
+  assert.ok(partial.calls.rewrite >= 1, `expected a reduced batch, got ${partial.calls.rewrite}`);
+  assert.ok(partial.calls.rewrite < COUNT, `all ${COUNT} articles were processed; budget reduction not exercised`);
+  assert.equal(partial.calls.verify, partial.calls.rewrite);
   const partialSnapshot = await (await partialStore.fetch('https://news.internal/snapshot')).json();
-  assert.equal(partialSnapshot.articles.filter((article) => article.rewriteStatus === 'rewritten').length, 1);
-  assert.equal(partialSnapshot.articles.filter((article) => article.rewriteStatus === 'original').length, COUNT - 1);
+  const rewritten = partialSnapshot.articles.filter((article) => article.rewriteStatus === 'rewritten').length;
+  assert.equal(rewritten, partial.calls.rewrite);
+  assert.equal(partialSnapshot.articles.filter((article) => article.rewriteStatus === 'original').length, COUNT - rewritten);
   const partialUsage = await (await partialStore.fetch('https://news.internal/usage')).json();
   assert.ok(partialUsage.used > 0 && partialUsage.used <= 60, `partial usage overspent: ${partialUsage.used}`);
 
-  console.log(`Batch passed: ${COUNT} full-text articles split into ${run.calls.rewrite} requests, each verification within the ${window}-token validator window; usage ${Math.round(usage.used)} neurons; a 60-neuron budget rewrites one article instead of deferring all.`);
+  console.log(`Batch passed: ${COUNT} full-text articles split into ${run.calls.rewrite} requests, each verification within the ${window}-token validator window; usage ${Math.round(usage.used)} neurons; a 60-neuron budget processes a reduced prefix (${partial.calls.rewrite}) instead of deferring all nine.`);
 } finally { await mf.dispose().catch(() => {}); await rm(directory, { recursive: true, force: true }).catch(() => {}); }

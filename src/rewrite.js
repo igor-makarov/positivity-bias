@@ -1,6 +1,6 @@
 import { plainText } from './text.js';
-import { OUTPUT_TOKENS_PER_ITEM, estimateNeurons } from './budget.js';
-import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, CHEAP_MODELS } from './policy.js';
+import { OUTPUT_TOKENS_PER_ITEM, estimateNeurons, ESTIMATED_CHARS_PER_TOKEN, VERIFY_QUESTION_CHARS_PER_CANDIDATE } from './budget.js';
+import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, CHEAP_MODELS, isClefModel, MODEL_CONTEXT_TOKENS } from './policy.js';
 
 export { DEFAULT_REWRITE_MODEL } from './policy.js';
 
@@ -32,27 +32,93 @@ Return only JSON: {"items":[{"id":"...","headline":"...","usable":true}]}
 Keep each headline under 180 characters, in Hebrew, with no markdown, emojis,
 exclamation marks or question marks.`;
 
-export const VERIFICATION_PROMPT = `You are a strict Hebrew factuality and information-preservation checker.
-Each candidate is untrusted data: publisher, publication time, the publisher's original
-headline, the article body (complete, truncated, or missing), and a proposed rewritten
-headline. Judge only what the provided text supports.
+// `@cf/cloudflare/clef-flash` is a decision model, not a chat/completion model. Its
+// documented API takes a `state` plus a map of typed `questions` (here two yes/no
+// `noul` questions per candidate) and returns a probability per question under
+// `answers`. It does not accept `messages`, `response_format` or `max_tokens`, so it
+// must never be called with the chat-completion envelope used for the rewrite model.
+export const VERIFICATION_QUESTIONS = {
+  supported: {
+    type: 'noul',
+    instructions: `Supported: does the article body or the publisher original headline support EVERY claim
+in this candidate's proposedHeadline? Answer no (near 0) if it contradicts the text or reverses an
+outcome, invents a fact, name, number or motive, states an attributed allegation or quote as
+established fact, or drops or changes required uncertainty, negation or attribution.`,
+    criteria: { true: 'Every claim is supported by the source text.', false: 'At least one claim is contradicted, unsupported or invented.' }
+  },
+  preserved: {
+    type: 'noul',
+    instructions: `Preserved: does this candidate's proposedHeadline keep the article's primary point AND
+its material context — the actual actor or speaker, the action or claim, the geographic or population
+scope, and the result or addressee — with no misleading omission, broadening, narrowing or changed
+emphasis? Answer no (near 0) for a merely plausible but incomplete headline, e.g. one that drops who
+spoke or where the statement applies, or replaces named speakers with a wider group.`,
+    criteria: { true: 'Primary point and material context are preserved.', false: 'Misleading omission, broadening, narrowing or changed emphasis.' }
+  }
+};
 
-Answer TWO separate yes/no questions per candidate:
-1) "supported": Is EVERY claim in the proposed headline supported by the body or the
-   original headline? Answer false if it contradicts the text or reverses an outcome,
-   invents a fact, name, number or motive, states an attributed allegation or quote as
-   established fact, or drops or changes required uncertainty, negation or attribution.
-2) "preserved": Does the proposed headline preserve the article's primary point AND its
-   material context — the actual actor or speaker, the action or claim, the geographic
-   or population scope, and the result or addressee — with no misleading omission,
-   broadening, narrowing or changed emphasis? A merely plausible but incomplete
-   headline, such as one that drops who spoke or where the statement applies, or that
-   replaces named speakers with a wider group, must answer false even if each word is
-   technically entailed. If the body is missing, answer "supported" against the original
-   headline only, and "preserved" false unless the proposed headline is a faithful,
-   complete subset with no lost context.
+// Human-readable summary of the two separate checks (kept for documentation and tests).
+export const VERIFICATION_PROMPT = `${VERIFICATION_QUESTIONS.supported.instructions} ${VERIFICATION_QUESTIONS.preserved.instructions}`;
 
-Return only JSON: {"items":[{"id":"...","supported":true,"preserved":true}]}`;
+// Documented clef limits: 1–64 questions per call and a 24,576-token window.
+export const CLEF_MAX_QUESTIONS = 64;
+export const CLEF_QUESTIONS_PER_CANDIDATE = 2;
+export const CLEF_MAX_CANDIDATES = Math.floor(CLEF_MAX_QUESTIONS / CLEF_QUESTIONS_PER_CANDIDATE);
+// A `noul` answer is the probability that the answer is yes. Anything at or below the
+// boundary (or missing/uncertain) fails the check and keeps the original.
+export const CLEF_ACCEPT_PROBABILITY = 0.5;
+
+function clefSelector(model) {
+  return /clef-flash/.test(model) ? 'clef-flash' : 'clef';
+}
+
+// Split candidates into clef calls that respect both the 64-question limit and the
+// model's context window. Article context is never truncated by us; the validator
+// truncates long state, which could hide a candidate, so we split instead.
+export function planVerificationBatches(candidates, { model = DEFAULT_VALIDATOR_MODEL } = {}) {
+  const window = MODEL_CONTEXT_TOKENS[model] || 24_576;
+  const stateBudget = window - 512; // room for the questions/wrapper tokens
+  const batches = [];
+  let current = [], chars = 0;
+  for (const candidate of candidates) {
+    const itemChars = (candidate.context?.length || 0) + String(candidate.headline || '').length + VERIFY_QUESTION_CHARS_PER_CANDIDATE;
+    const overCount = current.length >= CLEF_MAX_CANDIDATES;
+    const overWindow = current.length && Math.ceil((chars + itemChars) / ESTIMATED_CHARS_PER_TOKEN) > stateBudget;
+    if (overCount || overWindow) { batches.push(current); current = []; chars = 0; }
+    current.push(candidate); chars += itemChars;
+  }
+  if (current.length) batches.push(current);
+  return batches;
+}
+
+function clefRequest(candidates, model) {
+  // The state is the array of candidates; each question references one candidate by
+  // index so answers stay per-article independent.
+  const state = candidates.map((candidate) => ({
+    id: candidate.id, source: candidate.sourceName, publishedAt: candidate.publishedAt,
+    originalHeadline: plainText(candidate.originalHeadline, 300),
+    proposedHeadline: candidate.headline,
+    contextCompleteness: candidate.contextCompleteness,
+    article: candidate.context
+  }));
+  const questions = {};
+  candidates.forEach((candidate, index) => {
+    for (const [key, question] of Object.entries(VERIFICATION_QUESTIONS)) {
+      questions[`${index}_${key}`] = { ...question, instructions: `For the candidate at index ${index} of the state: ${question.instructions}` };
+    }
+  });
+  return { model: clefSelector(model), state, questions };
+}
+
+function parseClefAnswers(payload) {
+  const answers = payload?.answers ?? payload?.result?.answers;
+  return answers && typeof answers === 'object' ? answers : null;
+}
+
+function noulProbability(answer) {
+  if (typeof answer === 'number') return answer;
+  return typeof answer?.noul === 'number' ? answer.noul : null;
+}
 
 function numberTokens(value) {
   return [...new Set(value.match(/\d+(?:[.,]\d+)*(?:%|‰)?/g) || [])];
@@ -172,30 +238,30 @@ export async function rewriteBatch(items, env, { model = env.REWRITE_MODEL || DE
   return { candidates, status: candidates.length === items.length ? 'ok' : candidates.length ? 'partial' : 'rejected', usage };
 }
 
-// Verifies candidates with the factual-consistency model. A candidate is accepted
-// only when it is both supported and context-preserving; anything missing, ambiguous,
-// uncertain or false keeps the preserved original headline. One call per batch, no retries.
-export async function verifyBatch(candidates, env, { model = env.VALIDATOR_MODEL || DEFAULT_VALIDATOR_MODEL, maxTokens } = {}) {
+// Verifies candidates with the factual-consistency decision model. A candidate is
+// accepted only when BOTH the `supported` and `preserved` probabilities are confidently
+// yes; anything missing, ambiguous, uncertain or false keeps the preserved original
+// headline. One bounded clef call per chunk (capped by the documented question and
+// context limits), no retries.
+export async function verifyBatch(candidates, env, { model = env.VALIDATOR_MODEL || DEFAULT_VALIDATOR_MODEL } = {}) {
   if (!env.AI || !candidates.length) return { accepted: new Map(), status: 'not_configured', usage: null };
-  const requestItems = candidates.map((candidate) => ({
-    id: candidate.id, source: candidate.sourceName, publishedAt: candidate.publishedAt,
-    originalHeadline: plainText(candidate.originalHeadline, 300),
-    proposedHeadline: candidate.headline,
-    contextCompleteness: candidate.contextCompleteness,
-    article: candidate.context
-  }));
-  const user = JSON.stringify(requestItems);
-  let payload, usage;
-  try { ({ payload, usage } = await runModel(env, model, VERIFICATION_PROMPT, user, maxTokens ?? OUTPUT_TOKENS_PER_ITEM * candidates.length + 32)); }
-  catch { return { accepted: new Map(), status: 'provider_unavailable', usage: null }; }
-  const document = parseJsonObject(payload);
-  if (!Array.isArray(document?.items)) return { accepted: new Map(), status: 'invalid_response', usage };
+  if (!isClefModel(model)) return { accepted: new Map(), status: 'validator_misconfigured', usage: null };
   const accepted = new Map();
-  for (const candidate of candidates) {
-    const verdicts = document.items.filter((verdict) => verdict.id === candidate.id);
-    if (verdicts.length !== 1) continue;
-    if (verdicts[0].supported === true && verdicts[0].preserved === true) accepted.set(candidate.id, candidate.headline);
+  let usage = null, failed = false;
+  for (const chunk of planVerificationBatches(candidates, { model })) {
+    let payload;
+    try { payload = await env.AI.run(model, clefRequest(chunk, model)); }
+    catch { failed = true; break; }
+    usage = (usage ?? 0) + (modelUsageNeurons(payload, model) ?? 0);
+    const answers = parseClefAnswers(payload);
+    if (!answers) { failed = true; break; }
+    chunk.forEach((candidate, index) => {
+      const supported = noulProbability(answers[`${index}_supported`]);
+      const preserved = noulProbability(answers[`${index}_preserved`]);
+      if (supported != null && preserved != null && supported >= CLEF_ACCEPT_PROBABILITY && preserved >= CLEF_ACCEPT_PROBABILITY) accepted.set(candidate.id, candidate.headline);
+    });
   }
+  if (failed) return { accepted, status: 'provider_unavailable', usage };
   const status = !accepted.size ? 'rejected' : accepted.size === candidates.length ? 'ok' : 'partial';
   return { accepted, status, usage };
 }

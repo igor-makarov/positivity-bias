@@ -4,7 +4,7 @@ import { ingestSource, loadArticleContext } from './ingest.js';
 import { DEFAULT_CONTEXT_CHARS } from './extract.js';
 import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, needsRewrite, policyFingerprint, retireStaleRewrites, sourceFingerprint } from './policy.js';
 import { rewriteBatch, verifyBatch } from './rewrite.js';
-import { budgetDecision, dailyNeuronBudget, estimateBatchNeurons, fitBatchToBudget, planBatches, requestContextTokens } from './budget.js';
+import { budgetDecision, dailyNeuronBudget, estimateBatchNeurons, fitBatchToBudget, planBatches, requestContextTokens, SHARED_RESERVED_TOKENS_PER_ITEM } from './budget.js';
 
 const sources = validateWebsites(configuration);
 const HOUR = 3_600_000;
@@ -151,9 +151,11 @@ export class NewsStore {
     // The same context goes to the rewrite model and the validator, so a request may
     // only be as large as the smaller of their context windows.
     const contextLimit = requestContextTokens([model, validator]);
+    // The shared rewrite+verify request reserves a complete short rewrite result plus
+    // the two factual/preservation questions asked per candidate by the validator.
     const batches = planBatches(usable.map(({ article, context }) =>
       ({ article, context: context.text, contextLength: context.text.length, completeness: context.completeness })),
-      { model, contextTokens: contextLimit });
+      { model, contextTokens: contextLimit, outputTokensPerItem: SHARED_RESERVED_TOKENS_PER_ITEM });
     if (!batches.length) { snapshot.rewriteStatus = 'context_unavailable'; return; }
     const day = this.usageDay(now);
     const budget = dailyNeuronBudget(this.env);
@@ -200,7 +202,7 @@ export class NewsStore {
           article.rewriteSource = sourceFingerprint(article);
         }
       }
-      if (verified.status === 'provider_unavailable') { snapshot.rewriteStatus = 'provider_unavailable'; providerFailed = true; break; }
+      if (verified.status === 'provider_unavailable' || verified.status === 'validator_misconfigured') { snapshot.rewriteStatus = verified.status; providerFailed = true; break; }
     }
     snapshot.rewriteStatus = providerFailed ? snapshot.rewriteStatus
       : accepted ? 'ok' : deferred ? 'budget_deferred' : 'ok';

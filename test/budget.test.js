@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_DAILY_NEURON_BUDGET, MAX_DAILY_NEURON_BUDGET, budgetDecision, dailyNeuronBudget, estimateBatchNeurons, estimateNeurons, estimateTokens, fitBatchToBudget, planBatches, requestContextTokens } from '../src/budget.js';
+import { DEFAULT_DAILY_NEURON_BUDGET, MAX_DAILY_NEURON_BUDGET, SHARED_RESERVED_TOKENS_PER_ITEM, VERIFY_QUESTION_CHARS_PER_CANDIDATE, budgetDecision, dailyNeuronBudget, estimateBatchNeurons, estimateNeurons, estimateTokens, fitBatchToBudget, planBatches, requestContextTokens } from '../src/budget.js';
+import { MODEL_CONTEXT_TOKENS } from '../src/policy.js';
 
 test('The daily budget defaults conservatively and never exceeds the free allocation', () => {
   assert.equal(dailyNeuronBudget({}), DEFAULT_DAILY_NEURON_BUDGET);
@@ -35,7 +36,9 @@ test('Adaptive batches split on the model context window without truncating cont
 });
 
 test('Requests are limited by the smaller of the rewrite and validator context windows', () => {
-  assert.equal(requestContextTokens(['@cf/meta/llama-3.1-8b-instruct-fp8-fast', '@cf/cloudflare/clef-flash']), 32_768);
+  const clefWindow = MODEL_CONTEXT_TOKENS['@cf/cloudflare/clef-flash'];
+  assert.equal(clefWindow, 24_576); // documented decision-model window
+  assert.equal(requestContextTokens(['@cf/meta/llama-3.1-8b-instruct-fp8-fast', '@cf/cloudflare/clef-flash']), clefWindow);
   assert.equal(requestContextTokens(['@cf/meta/llama-3.2-1b-instruct']), 128_000);
   assert.equal(requestContextTokens(['@cf/unknown/model']), 32_768); // conservative default
   assert.equal(requestContextTokens(['@cf/meta/llama-3.1-8b-instruct-fp8-fast', '@cf/unknown/model']), 32_768); // unknown peer stays conservative
@@ -44,9 +47,21 @@ test('Requests are limited by the smaller of the rewrite and validator context w
   const rewriteOnly = planBatches(items, { model: '@cf/meta/llama-3.1-8b-instruct-fp8-fast' });
   const shared = planBatches(items, { model: '@cf/meta/llama-3.1-8b-instruct-fp8-fast',
     contextTokens: requestContextTokens(['@cf/meta/llama-3.1-8b-instruct-fp8-fast', '@cf/cloudflare/clef-flash']) });
-  assert.ok(shared.length > rewriteOnly.length); // the 32k validator window forces more splits
+  assert.ok(shared.length > rewriteOnly.length); // the smaller validator window forces more splits
   const itemTokens = Math.ceil(6000 / 1.5) + 128;
-  for (const batch of shared) assert.ok(1600 + batch.length * itemTokens + batch.length * 180 <= 32_768);
+  for (const batch of shared) assert.ok(1600 + batch.length * itemTokens + batch.length * 180 <= clefWindow);
+});
+
+test('The shared reservation covers the clef questions and clef charges no output tokens', () => {
+  assert.ok(SHARED_RESERVED_TOKENS_PER_ITEM > 180);
+  const items = [{ id: 'a', contextLength: 6000 }];
+  const estimate = estimateBatchNeurons({ rewrite: '@cf/meta/llama-3.1-8b-instruct-fp8-fast', validator: '@cf/cloudflare/clef-flash' }, items);
+  const verifyInput = estimateTokens('x'.repeat(6000 + VERIFY_QUESTION_CHARS_PER_CANDIDATE)) + 400;
+  const expected = estimateNeurons('@cf/meta/llama-3.1-8b-instruct-fp8-fast', estimateTokens('x'.repeat(6000)) + 400, 180)
+    + estimateNeurons('@cf/cloudflare/clef-flash', verifyInput, 0);
+  assert.ok(Math.abs(estimate - expected) < 1e-6);
+  // The clef output rate is zero: requested output never adds neurons.
+  assert.equal(estimateNeurons('@cf/cloudflare/clef-flash', 1000, 10_000), estimateNeurons('@cf/cloudflare/clef-flash', 1000, 0));
 });
 
 test('Output space is reserved per article, not as a fixed amount', () => {

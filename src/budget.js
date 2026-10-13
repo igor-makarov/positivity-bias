@@ -12,6 +12,13 @@ export const DEFAULT_DAILY_NEURON_BUDGET = 6_000;
 export const MAX_DAILY_NEURON_BUDGET = 10_000;
 export const ESTIMATED_CHARS_PER_TOKEN = 1.5; // deliberately conservative for Hebrew + JSON wrappers
 export const OUTPUT_TOKENS_PER_ITEM = 180; // one complete short headline (and one verdict)
+// Clef is asked two typed yes/no questions per candidate; the shared request must
+// reserve that instruction/JSON overhead in addition to the article context.
+export const VERIFY_QUESTION_CHARS_PER_CANDIDATE = 1_400;
+export const VERIFY_QUESTION_TOKENS_PER_CANDIDATE = Math.ceil(VERIFY_QUESTION_CHARS_PER_CANDIDATE / ESTIMATED_CHARS_PER_TOKEN);
+// One shared rewrite+verify request reserves a full short rewrite result plus the two
+// clef questions per candidate.
+export const SHARED_RESERVED_TOKENS_PER_ITEM = OUTPUT_TOKENS_PER_ITEM + VERIFY_QUESTION_TOKENS_PER_CANDIDATE;
 
 export function estimateTokens(value) {
   return Math.ceil(String(value ?? '').length / ESTIMATED_CHARS_PER_TOKEN) + 8;
@@ -37,14 +44,16 @@ export function budgetDecision(used, estimate, budget) {
 }
 
 // Estimated neuron cost of ONE shared rewrite+verification request for these items:
-// the full-text input goes to both models, and each reserves one complete short result.
-// Kept in one place so the ledger, the context plan and the budget plan agree.
+// the full-text input goes to both models, plus the per-candidate clef questions.
+// Clef charges input tokens only (no output-token charge). Kept in one place so the
+// ledger, the context plan and the budget plan agree.
 export function estimateBatchNeurons(models, items = []) {
   const count = items.length;
-  const inputChars = items.reduce((sum, item) => sum + (item.contextLength ?? String(item.context ?? '').length), 0);
-  const rewriteInput = estimateTokens('x'.repeat(inputChars)) + 400;
+  const contextChars = items.reduce((sum, item) => sum + (item.contextLength ?? String(item.context ?? '').length), 0);
+  const rewriteInput = estimateTokens('x'.repeat(contextChars)) + 400;
+  const verifyInput = estimateTokens('x'.repeat(contextChars + count * VERIFY_QUESTION_CHARS_PER_CANDIDATE)) + 400;
   return estimateNeurons(models.rewrite, rewriteInput, OUTPUT_TOKENS_PER_ITEM * count)
-    + estimateNeurons(models.validator, rewriteInput + 200 * count, OUTPUT_TOKENS_PER_ITEM * count);
+    + estimateNeurons(models.validator, verifyInput, 0);
 }
 
 // Reduce a context-sized batch to the largest prefix whose estimated cost fits the

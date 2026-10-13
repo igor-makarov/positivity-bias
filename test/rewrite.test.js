@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { acceptRewrite, DEFAULT_REWRITE_MODEL, EDITORIAL_PROMPT, VERIFICATION_PROMPT, modelUsageNeurons, parseJsonObject, parseModelText, rewriteBatch, verifyBatch } from '../src/rewrite.js';
+import { acceptRewrite, CLEF_MAX_CANDIDATES, DEFAULT_REWRITE_MODEL, EDITORIAL_PROMPT, VERIFICATION_PROMPT, VERIFICATION_QUESTIONS, modelUsageNeurons, parseJsonObject, parseModelText, planVerificationBatches, rewriteBatch, verifyBatch } from '../src/rewrite.js';
 import { DEFAULT_VALIDATOR_MODEL } from '../src/policy.js';
 import { OUTPUT_TOKENS_PER_ITEM } from '../src/budget.js';
 
@@ -9,6 +9,30 @@ const base = { id: 'story-1', sourceName: 'ynet', publishedAt: '2026-10-13T11:00
   context: 'המשטרה מסרה כי הנסיבות נבדקות. לפי המשטרה, 3 בני אדם נפצעו באירוע.',
   contextCompleteness: 'complete' };
 const result = (headline, extra = {}) => ({ id: 'story-1', headline, usable: true, ...extra });
+// Build a clef decision response: two `noul` probabilities per candidate, keyed by the
+// candidate index the request used.
+const clef = (verdicts) => {
+  const probability = (value) => typeof value === 'number' ? value : value ? 1 : 0;
+  return { model: 'clef-flash', answers: Object.fromEntries(verdicts.flatMap((verdict, index) => [
+    [`${index}_supported`, { type: 'noul', noul: probability(verdict.supported) }],
+    [`${index}_preserved`, { type: 'noul', noul: probability(verdict.preserved) }],
+  ])) };
+};
+const clefEnv = (verdicts) => ({ AI: { run: async (model, input) => {
+  assert.equal(model, DEFAULT_VALIDATOR_MODEL);
+  assert.equal(input.model, 'clef-flash'); // documented selector, not a chat envelope
+  assert.ok(Array.isArray(input.state));
+  assert.equal(input.messages, undefined);
+  assert.equal(input.response_format, undefined);
+  assert.equal(input.max_tokens, undefined);
+  // Documented question limits: 1..64 questions, ids of [A-Za-z0-9_.-] up to 100 chars.
+  const keys = Object.keys(input.questions);
+  assert.equal(keys.length, input.state.length * 2);
+  assert.ok(keys.length >= 1 && keys.length <= 64);
+  assert.ok(keys.every((key) => /^[A-Za-z0-9_.-]{1,100}$/.test(key)));
+  assert.ok(keys.every((key) => ['noul', 'choice', 'score'].includes(input.questions[key].type)));
+  return clef(verdicts);
+} } });
 
 test('Factual dry headlines preserve numbers and attribution against full context', () => {
   assert.equal(acceptRewrite(base, result('לפי המשטרה, 3 בני אדם נפצעו באירוע')), 'לפי המשטרה, 3 בני אדם נפצעו באירוע');
@@ -37,11 +61,7 @@ test('A success-to-failure reversal is rejected even before verification', () =>
   assert.equal(acceptRewrite(drone, { id: 'drone-1', headline: reversed, usable: true }), null);
 });
 test('The exact success-to-failure reversal is rejected by verification and keeps the original', async () => {
-  const env = { AI: { run: async (model) => {
-    assert.equal(model, DEFAULT_VALIDATOR_MODEL);
-    return { response: JSON.stringify({ items: [{ id: 'drone-1', supported: false, preserved: true }] }) };
-  } } };
-  const { accepted, status } = await verifyBatch([{ ...drone, headline: reversed }], env);
+  const { accepted, status } = await verifyBatch([{ ...drone, headline: reversed }], clefEnv([{ supported: false, preserved: true }]));
   assert.equal(accepted.size, 0);
   assert.equal(status, 'rejected');
 });
@@ -55,17 +75,17 @@ const periphery = { id: 'north-1', sourceName: 'mako', publishedAt: '2026-10-13T
   contextCompleteness: 'complete' };
 const abstractClaim = 'ראשי ערים קראו לשינוי דמוגרפי בישראל';
 test('A rewrite that drops the Karmiel/Dimona speakers and the residence point fails verification', async () => {
-  const env = { AI: { run: async () => ({ response: JSON.stringify({ items: [{ id: 'north-1', supported: true, preserved: false }] }) }) } };
-  const { accepted } = await verifyBatch([{ ...periphery, headline: abstractClaim }], env);
+  const { accepted } = await verifyBatch([{ ...periphery, headline: abstractClaim }], clefEnv([{ supported: true, preserved: false }]));
   assert.equal(accepted.size, 0);
 });
 test('A faithful rewrite that keeps the speakers and the tourism point is accepted', async () => {
   const faithful = 'ראשי הערים מכרמיאל ומדימונה: הצפון נתפס כצימר לסופ״ש ולא כמקום לגור בו';
   const env = { AI: { run: async (model, input) => {
-    const request = JSON.parse(input.messages[1].content)[0];
-    assert.match(request.article, /כרמיאל/); // full article context is sent to the validator
-    assert.ok(input.messages[0].content.includes('preserved'));
-    return { response: JSON.stringify({ items: [{ id: 'north-1', supported: true, preserved: true }] }) };
+    assert.equal(model, DEFAULT_VALIDATOR_MODEL);
+    assert.match(input.state[0].article, /כרמיאל/); // full article context is sent to the validator
+    assert.equal(input.questions['0_supported'].type, 'noul');
+    assert.match(input.questions['0_preserved'].instructions, /Preserved/);
+    return clef([{ supported: true, preserved: true }]);
   } } };
   const { accepted } = await verifyBatch([{ ...periphery, headline: faithful }], env);
   assert.equal(accepted.get('north-1'), faithful);
@@ -73,13 +93,38 @@ test('A faithful rewrite that keeps the speakers and the tourism point is accept
 
 test('Verification rejects a merely plausible but incomplete or uncertain candidate', async () => {
   for (const verdict of [
-    { id: 'north-1', supported: true, preserved: false },
-    { id: 'north-1', supported: false, preserved: true },
-    { id: 'north-1', supported: true }
+    { supported: true, preserved: false },
+    { supported: false, preserved: true },
+    { supported: true }, // missing preserved answer
+    { supported: 0.4, preserved: 0.9 } // below the documented yes boundary: uncertain
   ]) {
-    const env = { AI: { run: async () => ({ response: JSON.stringify({ items: [verdict] }) }) } };
-    assert.equal((await verifyBatch([{ ...periphery, headline: abstractClaim }], env)).accepted.size, 0);
+    assert.equal((await verifyBatch([{ ...periphery, headline: abstractClaim }], clefEnv([verdict]))).accepted.size, 0);
   }
+});
+
+test('Clef answers are parsed only from the documented answers envelope', async () => {
+  const byAnswer = (answer) => ({ AI: { run: async () => answer } });
+  // A chat-style response (the old, wrong shape) must not be mistaken for a verdict.
+  assert.equal((await verifyBatch([{ ...drone, headline: reversed }], byAnswer({ response: JSON.stringify({ items: [{ supported: true, preserved: true }] }) }))).status, 'provider_unavailable');
+  assert.equal((await verifyBatch([{ ...drone, headline: reversed }], byAnswer({ result: { answers: { '0_supported': { type: 'noul', noul: 1 }, '0_preserved': { type: 'noul', noul: 1 } } } }))).accepted.size, 1);
+  assert.equal((await verifyBatch([{ ...drone, headline: reversed }], byAnswer({ answers: {} }))).accepted.size, 0);
+});
+
+test('Verification is delegated only to a documented clef decision model', async () => {
+  const env = { AI: { run: async () => { throw new Error('Must not run'); } } };
+  const result = await verifyBatch([{ ...drone, headline: reversed }], env, { model: '@cf/meta/llama-3.1-8b-instruct-fp8-fast' });
+  assert.equal(result.status, 'validator_misconfigured');
+  assert.equal(result.accepted.size, 0);
+});
+
+test('Clef candidate chunks respect the documented question limit and context window', () => {
+  const many = Array.from({ length: 80 }, (_, index) => ({ ...base, id: `c${index}`, headline: 'לפי המשטרה, 3 בני אדם נפצעו באירוע', context: 'א'.repeat(6000) }));
+  const chunks = planVerificationBatches(many);
+  assert.ok(chunks.every((chunk) => chunk.length <= CLEF_MAX_CANDIDATES));
+  assert.ok(chunks.length > 1);
+  assert.equal(chunks.flat().length, 80); // no candidate is dropped
+  const huge = planVerificationBatches([{ ...base, id: 'huge', headline: 'כותרת', context: 'א'.repeat(24_576 * 3) }]);
+  assert.equal(huge.length, 1); // the validator truncates rather than us dropping a candidate
 });
 
 test('Cross-article independence: one rejected candidate does not affect a valid sibling', async () => {
@@ -88,12 +133,9 @@ test('Cross-article independence: one rejected candidate does not affect a valid
     { ...drone, id: 'bad', headline: reversed }
   ];
   const env = { AI: { run: async (model, input) => {
-    const sent = JSON.parse(input.messages[1].content);
-    assert.deepEqual(sent.map((item) => item.id), ['good', 'bad']); // clear, stable per-article boundaries
-    return { response: JSON.stringify({ items: [
-      { id: 'good', supported: true, preserved: true },
-      { id: 'bad', supported: false, preserved: false }
-    ] }) };
+    assert.equal(input.model, 'clef-flash');
+    assert.deepEqual(input.state.map((item) => item.id), ['good', 'bad']); // clear, stable per-article boundaries
+    return clef([{ supported: true, preserved: true }, { supported: false, preserved: false }]);
   } } };
   const { accepted, status } = await verifyBatch(candidates, env);
   assert.deepEqual([...accepted.keys()], ['good']);
@@ -137,7 +179,7 @@ test('A structured rewrite response accepts only requested, validated items and 
   assert.equal(response.candidates.length, 1);
   assert.equal(response.candidates[0].headline, 'לפי המשטרה, 3 בני אדם נפצעו באירוע');
 });
-test('Rewrite and verification reserve one complete short output per article', async () => {
+test('Rewrite reserves one complete short output per article; verification uses the clef schema', async () => {
   const items = [base, { ...base, id: 'story-2' }];
   const rewriteEnv = { AI: { run: async (model, input) => {
     assert.equal(input.max_tokens, OUTPUT_TOKENS_PER_ITEM * items.length + 32);
@@ -146,8 +188,11 @@ test('Rewrite and verification reserve one complete short output per article', a
   const { candidates } = await rewriteBatch(items, rewriteEnv);
   assert.equal(candidates.length, 2);
   const verifyEnv = { AI: { run: async (model, input) => {
-    assert.equal(input.max_tokens, OUTPUT_TOKENS_PER_ITEM * candidates.length + 32);
-    return { response: JSON.stringify({ items: candidates.map((item) => ({ id: item.id, supported: true, preserved: true })) }) };
+    assert.equal(input.model, 'clef-flash');
+    assert.equal(input.questions['0_supported'].type, 'noul');
+    assert.equal(input.questions['1_preserved'].type, 'noul');
+    assert.equal(input.max_tokens, undefined); // clef has no chat output reservation
+    return clef([{ supported: true, preserved: true }, { supported: true, preserved: true }]);
   } } };
   assert.equal((await verifyBatch(candidates, verifyEnv)).accepted.size, 2);
 });
@@ -200,6 +245,11 @@ test('A nested Qwen3 chat response is accepted through the rewrite batch', async
 test('Prompts require the primary point and material context, and separate verification questions', () => {
   assert.match(EDITORIAL_PROMPT, /material context/);
   assert.match(EDITORIAL_PROMPT, /never reverse an outcome/);
-  assert.match(VERIFICATION_PROMPT, /supported/);
-  assert.match(VERIFICATION_PROMPT, /preserved/);
+  // Clef is asked two separate typed yes/no questions per candidate.
+  assert.equal(VERIFICATION_QUESTIONS.supported.type, 'noul');
+  assert.equal(VERIFICATION_QUESTIONS.preserved.type, 'noul');
+  assert.match(VERIFICATION_QUESTIONS.supported.instructions, /Supported:/);
+  assert.match(VERIFICATION_QUESTIONS.preserved.instructions, /Preserved:/);
+  assert.match(VERIFICATION_PROMPT, /supported/i);
+  assert.match(VERIFICATION_PROMPT, /preserved/i);
 });

@@ -81,17 +81,21 @@ or missing) to the model. The editorial prompt requires the primary point and it
 material context — actor/speaker, action, geographic scope and result — and never
 reverses an outcome. Missing context keeps the original headline.
 
-A candidate is then checked with `@cf/cloudflare/clef-flash`, which answers two
-separate questions: is every claim supported by the source, and are the primary point
-and material context preserved without misleading omission, broadening, narrowing or
-changed emphasis? A candidate is accepted only when both are true; anything
-unsupported, incomplete or uncertain falls back to the preserved original.
+A candidate is then checked with `@cf/cloudflare/clef-flash`, Cloudflare's decision
+model. It is **not** a chat/completion model: it takes a `state` (the candidate records)
+plus a map of typed `questions`, and returns a probability per question. The verifier
+sends two `noul` (yes/no) questions per candidate — is every claim supported by the
+source, and are the primary point and material context preserved without misleading
+omission, broadening, narrowing or changed emphasis? A candidate is accepted only when
+both probabilities are a confident yes; anything unsupported, incomplete or uncertain
+falls back to the preserved original. Calls are chunked to the documented 64-question
+and 24,576-token limits. Clef is charged for input tokens only.
 
 Requests are sized adaptively from the actual full-text input, the context window,
 reserved output space and the remaining daily budget. The same context goes to both
 the rewrite model and the validator, so each request is limited to the **smaller** of
-their context windows (`clef-flash` is 32,768 tokens) and output space is reserved per
-article. The project reserves a
+their context windows (`clef-flash` is 24,576 tokens) and output space is reserved per
+article (a full short rewrite plus the two clef questions). The project reserves a
 conservative slice of the shared **10,000-neuron/day** free allocation
 (`DAILY_NEURON_BUDGET`, default 6000), persists the reservation before any model
 call, reconciles it with provider-reported usage, and defers work instead of
@@ -125,7 +129,7 @@ The archive retains up to 480 articles from the last 72 hours.
 
 The one-time `Start main loop` push workflow starts `main` using
 `igor-makarov/shurik@v1`, `opencode-go/deepseek-v4.1-flash`, high reasoning,
-`PROMPT.md`, a 600-second work budget and `wait-seconds=0` so iterations continue
+`PROMPT.md`, a 1,800-second work budget and `wait-seconds=0` so iterations continue
 immediately.
 It skips startup if `shurik-control/main` already exists. Only the iteration job
 receives the model key. Supported repository secret names are `OPENCODE_API_KEY`,

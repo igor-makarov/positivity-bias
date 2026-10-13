@@ -8,12 +8,18 @@ const validatorDefault = '@cf/cloudflare/clef-flash';
 function createMockAI(validatorModel) {
   const calls = { rewrite: 0, verify: 0 };
   const run = async (model, input) => {
-    const items = JSON.parse(input.messages[1].content);
     if (model === validatorModel) {
       calls.verify++;
-      return { response: JSON.stringify({ items: items.map((item) => ({ id: item.id, supported: true, preserved: !/\/2$/.test(item.id) })) }) };
+      // clef answers are `noul` probabilities keyed by the candidate index.
+      const answers = {};
+      input.state.forEach((item, index) => {
+        answers[`${index}_supported`] = { type: 'noul', noul: 1 };
+        answers[`${index}_preserved`] = { type: 'noul', noul: /\/2$/.test(item.id) ? 0 : 1 };
+      });
+      return { model: 'clef-flash', answers, usage: { input_tokens: 1000, output_tokens: 0 } };
     }
     calls.rewrite++;
+    const items = JSON.parse(input.messages[1].content);
     return { response: JSON.stringify({ items: items.map((item) => ({ id: item.id, usable: true,
       headline: /\/2$/.test(item.id) ? 'ראשי ערים קראו לשינוי דמוגרפי בישראל' : 'לפי המועצה אושרו 3 תוכניות' })) }) };
   };

@@ -4,7 +4,9 @@
 
 export const EDITORIAL_VERSION = 'editorial-v3';
 export const CONTEXT_POLICY = 'full-text-v2';
-export const VALIDATOR_VERSION = 'clef-guard-v1';
+// v2: clef-flash is driven through its documented decision schema (state + typed
+// yes/no questions), not the chat completion shape that its API does not accept.
+export const VALIDATOR_VERSION = 'clef-guard-v2';
 
 export const DEFAULT_REWRITE_MODEL = '@cf/meta/llama-3.1-8b-instruct-fp8-fast';
 export const DEFAULT_VALIDATOR_MODEL = '@cf/cloudflare/clef-flash';
@@ -24,7 +26,9 @@ export const MODEL_CONTEXT_TOKENS = {
   '@cf/qwen/qwen3-30b-a3b-fp8': 32_768,
   '@cf/meta/llama-3.2-1b-instruct': 128_000,
   '@cf/meta/llama-3.2-3b-instruct': 128_000,
-  [DEFAULT_VALIDATOR_MODEL]: 32_768,
+  // clef-flash is a decision model with a documented 24,576-token window.
+  [DEFAULT_VALIDATOR_MODEL]: 24_576,
+  '@cf/cloudflare/clef': 24_576,
 };
 
 // Estimated neurons per token, derived from Cloudflare's published per-million-token
@@ -35,11 +39,21 @@ export const MODEL_NEURON_RATES = {
   '@cf/qwen/qwen3-30b-a3b-fp8': { in: 0.00464, out: 0.03045 },
   '@cf/meta/llama-3.2-1b-instruct': { in: 0.00500, out: 0.03000 },
   '@cf/meta/llama-3.2-3b-instruct': { in: 0.00600, out: 0.03300 },
-  [DEFAULT_VALIDATOR_MODEL]: { in: 0.00400, out: 0.03300 },
+  // $0.038 per M input tokens and no output-token charge (0.038 / 11 = 0.0034545).
+  [DEFAULT_VALIDATOR_MODEL]: { in: 0.0034545, out: 0 },
+  '@cf/cloudflare/clef': { in: 0.0034545, out: 0 },
 };
 
 export function modelNeuronRate(model) {
   return MODEL_NEURON_RATES[model] || { in: 0.005, out: 0.035 };
+}
+
+// The factual-consistency decision may only be delegated to a documented clef
+// decision model; other models do not accept the state/questions schema below.
+export const CLEF_MODELS = new Set([DEFAULT_VALIDATOR_MODEL, '@cf/cloudflare/clef']);
+
+export function isClefModel(model) {
+  return CLEF_MODELS.has(model);
 }
 
 export function policyFingerprint(env = {}) {

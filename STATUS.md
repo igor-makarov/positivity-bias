@@ -7,6 +7,32 @@
 - Sessions/control are on `shurik-control/main`; iterations continue immediately
   (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
+## Verified (2026-10-13, iteration 2-9)
+
+19. **Clef factual-verification call was fundamentally wrong and is now fixed.**
+    `@cf/cloudflare/clef-flash` is a *decision* model, not a chat/completion model: its
+    documented API takes `{ model, state, questions }` (typed `noul`/`choice`/`score`
+    questions) and returns probabilities under `answers`. The previous verifier sent a
+    chat envelope (`messages`, `response_format`, `temperature`, `max_tokens`) and parsed
+    `choices`/`response`, which the real endpoint cannot accept, so in production every
+    rewrite would have fallen back to its original and the refresh would report
+    `provider_unavailable`. `verifyBatch` now builds the documented schema (two `noul`
+    questions per candidate, keyed by candidate index for per-article independence),
+    parses `answers[*].noul`, and accepts only when both probabilities are a confident
+    yes. Requests are chunked to the documented 64-question limit; a non-clef validator
+    is refused (`validator_misconfigured`). New unit regressions assert the exact request
+    shape (no `messages`/`response_format`/`max_tokens`), that a chat-shaped response is
+    never accepted as a verdict, and that uncertain/missing answers keep the original.
+20. **Clef window, pricing and budget corrected to the documented values.** The
+    validator window is 24,576 tokens (not 32,768) and clef charges input tokens only
+    ($0.038/M → 0.0034545 neurons/token, no output charge). `requestContextTokens`,
+    `MODEL_NEURON_RATES`/`MODEL_CONTEXT_TOKENS` and `estimateBatchNeurons` now reflect
+    that, and the shared per-item reservation includes the two clef questions, so a
+    rewrite+verify batch is sized for the real validator window without truncating
+    article context. `VALIDATOR_VERSION` is bumped to `clef-guard-v2`, retiring any
+    rewrite verified under the broken validator. `npm run test:batch` now reports the
+    24,576-token window; all other checks are unchanged.
+
 ## Verified (2026-10-13, iteration 2-8)
 
 16. **Budget-aware batch sizing.** `planBatches` sized requests by the context window
@@ -171,13 +197,18 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Latest full validation (iteration 2-8): `npm run check`, **50 unit tests**,
+Latest full validation (iteration 2-9): `npm run check`, **54 unit tests**,
 `npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
 `npm run test:pipeline` (mock model end-to-end + retire/reprocess), `npm run test:batch`
-(validator-window splitting + budget-aware reduction), `npm run test:browser` and
-`npm run test:interaction` all pass. The budget-aware batch and lost-headline
-retirement regressions were each shown to fail against the pre-fix logic and pass
-after it. (Iteration 2-5 ran the full battery twice.)
+(validator-window splitting, budget-aware reduction and the documented clef decision
+schema), `npm run test:browser` and `npm run test:interaction` all pass. The
+clef-schema regressions were added with the fix. (Iteration 2-5 ran the full battery twice.)
+
+Live re-check (iteration 2-9): four live ynet article pages and two live mako article
+pages extracted `complete` bodies (1,872–7,620 chars, one truncated at the 6,000-char
+cap) with JSON-LD headlines/sections; kan article pages remain client-rendered shells
+(42 chars → `missing`, original kept). A full live refresh (real feeds, mock model)
+ingested 126 articles across ynet/kan/n12/mako, all `ok`, with real full-text context.
 
 ## Blocked / needs input
 
@@ -186,13 +217,17 @@ after it. (Iteration 2-5 ran the full battery twice.)
    deployed URL could not be inspected. Reconcile `wrangler.jsonc`
    (`positivity-bias`) with the connected Workers Builds Worker once access is
    available. Do not create a parallel deployment.
-2. **Live inference unverified.** Workers AI Hebrew quality, the `AI` binding,
-   Clef Flash behaviour and real neuron use remain unmeasured. Mocks/fixtures prove
-   wiring and fallbacks only. Switch the default to Qwen3 only after measured live
-   checks. Do not interpret a passing fixture as successful production inference.
-   Real-article extraction itself has now been exercised against live pages (see
-   iteration 2-5); mako/N12 serve a bot challenge to the project User-Agent, so those
-   articles preserve originals rather than bypassing the challenge.
+2. **Live inference unverified.** Workers AI Hebrew quality, the `AI` binding and real
+   neuron use remain unmeasured. Mocks/fixtures prove wiring and fallbacks only. Switch
+   the default to Qwen3 only after measured live checks. Do not interpret a passing
+   fixture as successful production inference. Real-article extraction was re-exercised
+   against live pages in iteration 2-9; mako/N12 now served extractable pages, kan
+   remains a client-rendered shell.
+   Iteration 2-9 fixed the clef-flash integration: the verifier now uses the documented
+   decision schema (`state` + typed `noul` questions → `answers[*].noul`) instead of a
+   chat envelope, and the 24,576-token window / input-only pricing are used. A live
+   account is still needed to measure the *quality* of clef's yes/no probabilities and
+   real neuron use; the request/response contract now matches the published schema.
    Evidence for the Qwen3 switch (iteration 2-6, docs/schema check): Cloudflare's
    Qwen3 page documents `response_format` and exposes `choices.message.reasoning_content`,
    and workerd's bundled AI types declare `chat_template_kwargs` for gpt-oss but not for
