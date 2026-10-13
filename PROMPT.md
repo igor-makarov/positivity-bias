@@ -40,16 +40,20 @@ The user supplied a second screenshot, generated with a 3B model. Its source tit
 "האוכלוסייה בישראל רואה את הצפון כצימר לסופ״ש אבל לא כמקום לגור בו"
 became:
 "ראשי ערים קראו לשינוי דמוגרפי בישראל"
-The user clarified that the original headline was also poor and that a better
-headline must identify the speakers as **mayors in the north** ("ראשי ערים בצפון")
-at minimum. Treat the actor AND northern geographical scope as essential facts in
-this regression. Preserve the actual tourism-versus-permanent-residence point and
-its attribution; do not turn it into an abstract national demographic-policy claim.
-A candidate direction, conditional on the article supporting the quoted claim:
-"ראשי ערים בצפון: הציבור רואה באזור יעד לנופש ולא למגורים".
-Ground the final wording in the accessible article body and the user's confirmed
-speaker context; do not invent a policy demand or other facts. Add this exact case
-as a second regression, alongside the successful-drone-test reversal.
+The user clarified that the original headline was also poor and that the actual
+speakers were mayors from **Karmiel and Dimona** (כרמיאל ודימונה). The appropriate
+speaker context is **mayors in the periphery** ("ראשי ערים בפריפריה"), or explicitly
+"ראשי ערים מכרמיאל ומדימונה"; do NOT label both speakers as northern mayors.
+Treat the actor AND this geographical context as essential facts in the regression.
+Preserve the actual tourism-versus-permanent-residence point and its attribution;
+do not replace it with an unsupported abstract national demographic-policy claim.
+The speakers' locations and the geographical scope of their statement are separate:
+derive the latter from the article body. Do not automatically broaden a statement
+about the north into a statement about every peripheral region, or assume the
+original headline quoted the article accurately. Ground the final wording in the
+accessible body and the user's confirmed Karmiel/Dimona speaker context; do not
+invent a policy demand or other facts. Add this exact case as a second regression,
+alongside the successful-drone-test reversal.
 
 Both the runtime grounding/editorial prompt AND Clef Flash verification must
 prioritize information preservation, not only factual non-contradiction:
@@ -59,8 +63,10 @@ prioritize information preservation, not only factual non-contradiction:
 - Find the real central point in the article, including speakers and location,
   even when the publisher headline is vague or poor. Original-title fidelity is
   not a substitute for article-grounded information selection. In this example,
-  omission of "ראשי ערים בצפון" must fail material-context verification, as must
-  replacing the north/residence issue with an abstract national demographic claim.
+  omission of the speaker context ("ראשי ערים בפריפריה" or the explicit
+  Karmiel/Dimona cities) must fail material-context verification, as must labelling
+  both speakers as northern mayors, changing the claim's actual geographic scope,
+  or replacing its concrete residence issue with an unsupported demographic claim.
 - Distinguish an attributed opinion or quoted perception from an established fact.
   Removing quote marks does not authorize presenting the quotation as fact.
 - Remove sensational tone without erasing the core point. Prioritize these material
