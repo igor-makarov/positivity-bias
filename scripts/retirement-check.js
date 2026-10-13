@@ -6,7 +6,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { DEFAULT_REWRITE_MODEL, policyFingerprint } from '../src/policy.js';
+import { DEFAULT_REWRITE_MODEL, policyFingerprint, sourceFingerprint } from '../src/policy.js';
 
 const directory = await mkdtemp(join(process.cwd(), '.probe-'));
 const outfile = join(directory, 'probe.js');
@@ -80,7 +80,15 @@ try {
   const trusted = { id: 'trusted-5', url: 'https://www.ynet.co.il/news/article/5', sourceId: 'ynet', sourceName: 'ynet',
     originalHeadline: 'העירייה תפתח 2 גנים חדשים', headline: 'העירייה תפתח 2 גנים חדשים בשכונה', rewriteStatus: 'rewritten',
     rewriteFingerprint: active, categories: ['חדשות'], publishedAt: now, description: 'תיאור' };
-  await store.fetch('https://news.internal/seed', { method: 'POST', body: JSON.stringify({ articles: [staleArticle, headlessArticle, trusted],
+  // A partial persist can leave the ACTIVE fingerprint/status set while losing the
+  // generated headline. That decision is not displayable and must restore the original
+  // rather than serve an empty headline.
+  const trustedHeadless = { id: 'trusted-headless-6', url: 'https://www.ynet.co.il/news/article/6', sourceId: 'ynet', sourceName: 'ynet',
+    originalHeadline: 'הנמל ייפתח מחדש בשבוע הבא', headline: undefined, rewriteStatus: 'rewritten',
+    rewriteFingerprint: active, categories: ['חדשות'], publishedAt: now, description: 'תיאור' };
+  const rejectedSeed = { ...trustedHeadless, id: 'trusted-rejected-7', headline: '', rewriteStatus: 'rejected' };
+  rejectedSeed.rewriteSource = sourceFingerprint(rejectedSeed);
+  await store.fetch('https://news.internal/seed', { method: 'POST', body: JSON.stringify({ articles: [staleArticle, headlessArticle, trusted, trustedHeadless, rejectedSeed],
     updatedAt: now, lastAttemptAt: now, policyFingerprint: active, rewriteStatus: 'ok', sources: [] }) });
   const forced = await (await mf.dispatchFetch('https://fixture.local/api/news')).json();
   const forcedById = new Map(forced.articles.map((entry) => [entry.id, entry]));
@@ -88,6 +96,10 @@ try {
   assert.equal(forcedById.get(headlessArticle.id).headline, headlessArticle.originalHeadline);
   assert.equal(forcedById.get(trusted.id).headline, trusted.headline);
   assert.equal(forcedById.get(trusted.id).rewriteStatus, 'rewritten');
+  assert.equal(forcedById.get(trustedHeadless.id).headline, trustedHeadless.originalHeadline); // trusted but headless: restored
+  assert.equal(forcedById.get(trustedHeadless.id).rewriteStatus, 'original');
+  assert.equal(forcedById.get(rejectedSeed.id).headline, rejectedSeed.originalHeadline); // empty rejected headline: restored
+  assert.equal(forcedById.get(rejectedSeed.id).rewriteStatus, 'original');
 
   console.log('Retirement passed: a stale cached headline is never served and the migration persists without inference.');
 } finally { await mf.dispose().catch(() => {}); await rm(directory, { recursive: true, force: true }).catch(() => {}); }

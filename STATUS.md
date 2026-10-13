@@ -7,6 +7,35 @@
 - Sessions/control are on `shurik-control/main`; iterations continue immediately
   (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
+## Verified (2026-10-13, iteration 2-11)
+
+23. **Headline-less trusted rewrite could still be served.** `retireStaleRewrites`
+    trusted any article whose `rewriteFingerprint` matched the active policy and whose
+    `rewriteStatus` was `rewritten`/`rejected`, so a partial/corrupted snapshot that kept
+    the current fingerprint/status but lost the generated `headline` was still served with
+    `headline: undefined` (the API omits the key, so the client rendered an empty link).
+    The decision is now trusted only when it carries a usable (non-empty string) stored
+    headline; a headline-less decision is retired to the preserved original and queued for
+    reprocessing. New unit regression fails against the pre-fix early return and passes
+    after it; `npm run test:retirement` seeds a current-fingerprint headless `rewritten`
+    and an empty-headline `rejected` article into the real Worker and proves both are
+    restored on serve while a genuine current rewrite is still kept (shown to fail
+    pre-fix).
+24. **Clef and Qwen3 request/answer contracts re-verified against the live docs.**
+    Fetched `schema-input.json`/`schema-output.json` and the model pages: clef requires
+    `{ model: "clef-flash", state, questions }` (1–64 typed questions; `noul` answer is an
+    object `{ type: "noul", noul: 0..1 }` keyed by question id; `usage` carries
+    `input_tokens`/`output_tokens`; 24,576-token window, input-only billing). The verifier
+    matches this exactly. Qwen3 (`@cf/qwen/qwen3-30b-a3b-fp8`) documents 32,768 tokens and
+    $0.0509/M in, $0.335/M out (matching `MODEL_NEURON_RATES`); no documented
+    thinking-off parameter, so the `/no_think` soft switch plus best-effort
+    `chat_template_kwargs` remains the approach.
+25. **Live refresh re-measured (real feeds, mock model, no credentials).** 127 articles
+    ingested, all four sources `ok`: ynet 115, kan 8, n12 74, mako 61. Sampled rewrite
+    contexts were `complete` (ynet 876–2688, N12 1872–4080, mako 3196–3911 chars) with two
+    mako articles `truncated` at the 6,000-char cap; no bot-block or extraction failure.
+    Context completeness stays transient (never persisted or exposed).
+
 ## Verified (2026-10-13, iteration 2-10)
 
 21. **Clef acceptance boundary corrected (uncertain verdicts now keep the original).**
@@ -228,15 +257,15 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Latest full validation (iteration 2-10): `npm run check`, **55 unit tests**,
-`npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
+Latest full validation (iteration 2-11): `npm run check`, **56 unit tests**,
+`npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`
+(adds the current-fingerprint headless-rewrite serve-time regression),
 `npm run test:pipeline` (mock model end-to-end, retire/reprocess and honest
 invalid-response status), `npm run test:batch`
 (validator-window splitting, budget-aware reduction and the documented clef decision
-schema), `npm run test:browser` and `npm run test:interaction` all pass. The new
-confident-yes boundary regression was shown to fail against the previous `0.5` boundary
-and pass after the fix, and the invalid-response assertion was shown to fail (`ok`)
-against the pre-fix status logic and pass after it.
+schema), `npm run test:browser` and `npm run test:interaction` all pass. The
+headline-less-decision regression was shown to fail against the pre-fix early return
+(both unit and workerd serve paths) and pass after the fix.
 
 Live re-check (iteration 2-9): four live ynet article pages and two live mako article
 pages extracted `complete` bodies (1,872–7,620 chars, one truncated at the 6,000-char

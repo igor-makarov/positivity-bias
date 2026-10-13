@@ -90,3 +90,28 @@ test('A generated headline with no status or fingerprint is still retired as unt
   assert.equal(restored.articles[0].headline, legacy.originalHeadline);
   assert.equal(restored.articles[0].rewriteStatus, 'original');
 });
+
+test('A current-policy decision whose stored headline was lost is still restored, not served empty', () => {
+  // Even a decision carrying the ACTIVE fingerprint must not expose a headline-less
+  // article: a partial/corrupted persist could leave rewriteStatus/fingerprint set but
+  // the generated headline missing, and the display invariant is that the preserved
+  // original is always shown. Trust a decision only when it carries a usable headline.
+  const trustedRewritten = { ...stale, rewriteFingerprint: fingerprint, rewriteStatus: 'rewritten', headline: undefined };
+  const rewritten = retireStaleRewrites([trustedRewritten], fingerprint);
+  assert.equal(rewritten.changed, true);
+  assert.equal(rewritten.articles[0].headline, stale.originalHeadline);
+  assert.equal(rewritten.articles[0].rewriteStatus, 'original');
+
+  const trustedRejected = { ...stale, headline: '', rewriteStatus: 'rejected',
+    rewriteFingerprint: fingerprint, rewriteSource: sourceFingerprint(stale) };
+  const rejected = retireStaleRewrites([trustedRejected], fingerprint);
+  assert.equal(rejected.changed, true);
+  assert.equal(rejected.articles[0].headline, stale.originalHeadline);
+  assert.equal(rejected.articles[0].rewriteStatus, 'original');
+
+  // A trusted decision with a usable headline is still kept, so normal accepted rewrites
+  // and cached rejections are untouched.
+  const accepted = { ...stale, headline: 'תעשייה אווירית: ניסוי מוצלח במל״ט', rewriteFingerprint: fingerprint, rewriteStatus: 'rewritten' };
+  assert.equal(retireStaleRewrites([accepted], fingerprint).changed, false);
+  assert.equal(retireStaleRewrites([accepted], fingerprint).articles[0].headline, accepted.headline);
+});

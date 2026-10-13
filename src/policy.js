@@ -97,13 +97,17 @@ export function retireStaleRewrites(articles, fingerprint) {
     // generated rewrite even when the legacy snapshot lost its status/fingerprint. Such
     // an untrusted headline must never be served, so treat it as a decision to retire
     // and restore the preserved original (never serve an empty headline).
+    // A decision with a missing/empty stored headline is never displayable, so it is
+    // retired to the original even when its fingerprint matches the active policy; a
+    // partial or corrupted snapshot must not be able to expose a headline-less article.
+    const usable = typeof article.headline === 'string' && article.headline.length > 0;
     const generated = typeof article.originalHeadline === 'string'
-      && (typeof article.headline !== 'string' || article.headline !== article.originalHeadline);
+      && (!usable || article.headline !== article.originalHeadline);
     const hasDecision = article.rewriteStatus === 'rewritten' || article.rewriteStatus === 'rejected'
       || article.rewriteFingerprint != null || generated;
     if (!hasDecision) return article;
-    if (article.rewriteFingerprint === fingerprint && article.rewriteStatus === 'rewritten') return article;
-    if (article.rewriteFingerprint === fingerprint && article.rewriteStatus === 'rejected' && article.rewriteSource === sourceFingerprint(article)) return article;
+    if (usable && article.rewriteFingerprint === fingerprint && article.rewriteStatus === 'rewritten') return article;
+    if (usable && article.rewriteFingerprint === fingerprint && article.rewriteStatus === 'rejected' && article.rewriteSource === sourceFingerprint(article)) return article;
     changed = true;
     const { rewriteFingerprint, rewriteSource, verification, context, contextCompleteness, ...rest } = article;
     return { ...rest, headline: article.originalHeadline, rewriteStatus: 'original' };
