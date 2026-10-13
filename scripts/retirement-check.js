@@ -88,7 +88,13 @@ try {
     rewriteFingerprint: active, categories: ['חדשות'], publishedAt: now, description: 'תיאור' };
   const rejectedSeed = { ...trustedHeadless, id: 'trusted-rejected-7', headline: '', rewriteStatus: 'rejected' };
   rejectedSeed.rewriteSource = sourceFingerprint(rejectedSeed);
-  await store.fetch('https://news.internal/seed', { method: 'POST', body: JSON.stringify({ articles: [staleArticle, headlessArticle, trusted, trustedHeadless, rejectedSeed],
+  // A cached rejection must display the preserved original. A corrupted snapshot can leave
+  // `rejected` with the active fingerprint/source but a generated headline; the public API
+  // maps `rejected` to `original`, so serving it would present the rewrite as the
+  // publisher's own headline with no disclosure.
+  const pollutedRejected = { ...trustedHeadless, id: 'polluted-rejected-8', headline: 'הנמל ייסגר לצמיתות בשבוע הבא', rewriteStatus: 'rejected' };
+  pollutedRejected.rewriteSource = sourceFingerprint(pollutedRejected);
+  await store.fetch('https://news.internal/seed', { method: 'POST', body: JSON.stringify({ articles: [staleArticle, headlessArticle, trusted, trustedHeadless, rejectedSeed, pollutedRejected],
     updatedAt: now, lastAttemptAt: now, policyFingerprint: active, rewriteStatus: 'ok', sources: [] }) });
   const forced = await (await mf.dispatchFetch('https://fixture.local/api/news')).json();
   const forcedById = new Map(forced.articles.map((entry) => [entry.id, entry]));
@@ -100,6 +106,8 @@ try {
   assert.equal(forcedById.get(trustedHeadless.id).rewriteStatus, 'original');
   assert.equal(forcedById.get(rejectedSeed.id).headline, rejectedSeed.originalHeadline); // empty rejected headline: restored
   assert.equal(forcedById.get(rejectedSeed.id).rewriteStatus, 'original');
+  assert.equal(forcedById.get(pollutedRejected.id).headline, pollutedRejected.originalHeadline); // generated headline on a rejection: never served as the original
+  assert.equal(forcedById.get(pollutedRejected.id).rewriteStatus, 'original');
 
   console.log('Retirement passed: a stale cached headline is never served and the migration persists without inference.');
 } finally { await mf.dispose().catch(() => {}); await rm(directory, { recursive: true, force: true }).catch(() => {}); }

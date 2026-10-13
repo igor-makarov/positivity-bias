@@ -107,10 +107,20 @@ export function retireStaleRewrites(articles, fingerprint) {
       || article.rewriteFingerprint != null || generated;
     if (!hasDecision) return article;
     if (usable && article.rewriteFingerprint === fingerprint && article.rewriteStatus === 'rewritten') return article;
-    if (usable && article.rewriteFingerprint === fingerprint && article.rewriteStatus === 'rejected' && article.rewriteSource === sourceFingerprint(article)) return article;
+    // A cached rejection is a decision to display the PRESERVED original headline. Trust
+    // it only when it actually carries that original: a partial/corrupted snapshot could
+    // leave `rejected` with a generated headline, which the public API maps to
+    // `original` and would serve as if the publisher had written it. Such a decision is
+    // retired to the preserved original like any other stale rewrite.
+    const showsOriginal = usable && typeof article.originalHeadline === 'string' && article.headline === article.originalHeadline;
+    if (showsOriginal && article.rewriteFingerprint === fingerprint && article.rewriteStatus === 'rejected' && article.rewriteSource === sourceFingerprint(article)) return article;
     changed = true;
     const { rewriteFingerprint, rewriteSource, verification, context, contextCompleteness, ...rest } = article;
-    return { ...rest, headline: article.originalHeadline, rewriteStatus: 'original' };
+    // Restore the preserved original. If a malformed snapshot has no usable original to
+    // restore, keep the existing headline rather than blanking the article.
+    const restored = typeof article.originalHeadline === 'string' && article.originalHeadline.length > 0
+      ? article.originalHeadline : usable ? article.headline : article.originalHeadline;
+    return { ...rest, headline: restored, rewriteStatus: 'original' };
   });
   return { articles: changed ? next : articles, changed };
 }

@@ -115,3 +115,24 @@ test('A current-policy decision whose stored headline was lost is still restored
   assert.equal(retireStaleRewrites([accepted], fingerprint).changed, false);
   assert.equal(retireStaleRewrites([accepted], fingerprint).articles[0].headline, accepted.headline);
 });
+
+test('A trusted rejection that carries a generated headline is restored, not served as the original', () => {
+  // A cached rejection means "show the preserved original". A partial/corrupted snapshot
+  // can leave `rejected` with the active fingerprint/source but a generated headline; the
+  // public API maps `rejected` to `original`, so serving it would present the rewrite as
+  // the publisher's own headline with no disclosure. It must be retired to the original.
+  const polluted = { ...stale, headline: 'תעשייה אווירית: ניסוי מוצלח במל״ט', rewriteStatus: 'rejected',
+    rewriteFingerprint: fingerprint, rewriteSource: sourceFingerprint(stale) };
+  const { articles, changed } = retireStaleRewrites([polluted], fingerprint);
+  assert.equal(changed, true);
+  assert.equal(articles[0].headline, stale.originalHeadline);
+  assert.equal(articles[0].rewriteStatus, 'original');
+  assert.equal(articles[0].rewriteFingerprint, undefined);
+  assert.equal(articles[0].rewriteSource, undefined);
+  assert.deepEqual(articles[0].categories, ['חדשות']);
+  // A genuine cached rejection (headline IS the preserved original) is still trusted and
+  // is not re-reserved/re-inferred.
+  const genuine = { ...polluted, headline: stale.originalHeadline };
+  assert.equal(retireStaleRewrites([genuine], fingerprint).changed, false);
+  assert.equal(needsRewrite(genuine, fingerprint), false);
+});

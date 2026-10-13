@@ -7,6 +7,34 @@
 - Sessions/control are on `shurik-control/main`; iterations continue immediately
   (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
+## Verified (2026-10-13, iteration 2-13)
+
+28. **A cached rejection could be served as a generated headline labelled "original".**
+    `retireStaleRewrites` trusted any `rejected` article whose policy fingerprint and
+    `rewriteSource` matched the active policy, without checking that its stored
+    `headline` was actually the preserved original. A partial/corrupted/legacy snapshot
+    could therefore leave `rejected` carrying a generated headline; the public API maps
+    every non-`rewritten` status to `original`, so the visitor would see the rewrite as
+    if the publisher had written it, with no original-headline disclosure. A cached
+    rejection is now trusted only when it carries the preserved original headline
+    (`showsOriginal`); anything else is retired to the original like any stale rewrite.
+    The restore step also keeps an existing headline when a malformed snapshot has no
+    original to restore, so nothing is blanked. New unit regression (`60` unit tests)
+    and a `npm run test:retirement` seeded current-fingerprint rejection with a generated
+    headline: both were shown to fail against the pre-fix trust condition (the generated
+    headline was served) and pass after it, while a genuine cached rejection
+    (`headline === originalHeadline`) is still trusted and never re-inferred.
+29. **Live full-text extraction re-measured on real publisher articles (fresh run).**
+    Real feeds ingested `ok`: ynet 115, kan 8, n12 74, mako 61. Sampled contexts:
+    ynet `complete` 1,920/2,384/2,688 chars, N12 `complete` 4,487, mako `complete` 908;
+    a sampled mako request was answered with a Radware `validate.perfdrive.com`
+    challenge and correctly refused (`unapproved_redirect`, original kept — the pipeline
+    does not follow bot challenges). The live kan feed contains the exact reported
+    drone-test headline (`...השלימה בהצלחה ניסוי במל״ט שמצויד במקלע`, kan-news/defense/1108988),
+    but kan article pages are client-rendered shells (42 chars → `missing`), so that
+    article keeps its preserved original rather than being rewritten from chrome.
+    Context completeness stays transient and is never persisted or exposed.
+
 ## Verified (2026-10-13, iteration 2-12)
 
 26. **A model omission was cached as a source-grounded rejection.** `rewritePending`
@@ -286,15 +314,15 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Latest full validation (iteration 2-12): `npm run check`, **59 unit tests**,
+Latest full validation (iteration 2-13): `npm run check`, **60 unit tests**,
 `npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`
-(adds the current-fingerprint headless-rewrite serve-time regression),
+(adds the current-fingerprint generated-headline rejection serve-time regression),
 `npm run test:pipeline` (mock model end-to-end, retire/reprocess, honest
 invalid-response status and the model-omission retry), `npm run test:batch`
 (validator-window splitting, budget-aware reduction and the documented clef decision
-schema), `npm run test:browser` and `npm run test:interaction` all pass. The
-model-omission regression was shown to fail against the pre-fix caching loop (the
-omitted article stored as `rejected`, zero retry calls) and pass after the fix.
+schema), `npm run test:browser` and `npm run test:interaction` all pass. The new
+rejection-invariant unit and retirement regressions were shown to fail against the
+pre-fix trust condition (a generated headline served as `original`) and pass after it.
 
 Live re-check (iteration 2-9): four live ynet article pages and two live mako article
 pages extracted `complete` bodies (1,872–7,620 chars, one truncated at the 6,000-char
