@@ -299,6 +299,34 @@ test('Qwen3 chat envelopes resolve under top-level, result and response wrappers
   assert.equal(parseModelText({ choices: [{ message: { content: '', reasoning_content: 'סיבה' } }] }), '');
   assert.ok(modelUsageNeurons({ result: { usage: { prompt_tokens: 1000, completion_tokens: 100 } } }, '@cf/qwen/qwen3-30b-a3b-fp8') > 0);
 });
+const TAGS = { open: String.fromCharCode(60) + 'think' + String.fromCharCode(62), close: String.fromCharCode(60) + '/think' + String.fromCharCode(62) };
+
+test('A Qwen3 reasoning wrapper around the JSON answer is stripped before parsing', () => {
+  const content = JSON.stringify({ items: [{ id: 'story-1', headline: 'לפי המשטרה, 3 בני אדם נפצעו באירוע', usable: true }] });
+  const expected = { items: [{ id: 'story-1', headline: 'לפי המשטרה, 3 בני אדם נפצעו באירוע', usable: true }] };
+  // Qwen3 emits a reasoning block even when thinking is disabled (its content may be
+  // empty); the JSON that follows must still be extracted. Braces inside the reasoning
+  // must not confuse brace matching either.
+  assert.deepEqual(parseJsonObject(TAGS.open + '\n\n\n\n' + TAGS.close + '\n\n' + content), expected);
+  assert.deepEqual(parseJsonObject(TAGS.open + 'about {json} and {...} ' + TAGS.close + content), expected);
+  // A truncated response that only holds reasoning is still unparseable, never accepted.
+  assert.equal(parseJsonObject(TAGS.open + 'still reasoning about the {article'), null);
+  // An ordinary JSON answer without a wrapper is unchanged.
+  assert.deepEqual(parseJsonObject(content), expected);
+});
+test('A Qwen3 response with an inline reasoning wrapper is accepted through the rewrite batch', async () => {
+  const env = { AI: { run: async (model, input) => {
+    assert.equal(model, '@cf/qwen/qwen3-30b-a3b-fp8');
+    assert.equal(input.chat_template_kwargs.enable_thinking, false);
+    const content = JSON.stringify({ items: [result('לפי המשטרה, 3 בני אדם נפצעו באירוע')] });
+    // The reasoning arrives inline in \`content\` (no separate reasoning_content).
+    return { choices: [{ message: { content: TAGS.open + 'The user wants {json}. ' + TAGS.close + content } }] };
+  } } };
+  const { candidates, status } = await rewriteBatch([base], env, { model: '@cf/qwen/qwen3-30b-a3b-fp8' });
+  assert.equal(status, 'ok');
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].headline, 'לפי המשטרה, 3 בני אדם נפצעו באירוע');
+});
 test('A nested Qwen3 chat response is accepted through the rewrite batch', async () => {
   const env = { AI: { run: async (model) => {
     assert.equal(model, '@cf/qwen/qwen3-30b-a3b-fp8');

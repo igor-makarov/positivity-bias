@@ -4,6 +4,11 @@
 import worker, { NewsStore } from '../src/worker.js';
 
 const validatorDefault = '@cf/cloudflare/clef-flash';
+// Qwen3 wraps its answer in a reasoning block that its chat template emits even when
+// thinking is disabled. Build the tags at runtime so this probe (and the pipeline check)
+// proves the Worker strips that wrapper instead of only assuming a clean JSON answer.
+const THINK_OPEN = String.fromCharCode(60) + 'think' + String.fromCharCode(62);
+const THINK_CLOSE = String.fromCharCode(60) + '/think' + String.fromCharCode(62);
 
 function createMockAI(validatorModel, rewriteMode, validatorMode) {
   const calls = { rewrite: 0, verify: 0, models: [] };
@@ -27,7 +32,7 @@ function createMockAI(validatorModel, rewriteMode, validatorMode) {
     // `choices[].message.content` (with a thinking channel), the older Llama shape under
     // `response`. This keeps the default-model path honest instead of assuming one shape.
     const envelope = (content) => /qwen3/i.test(model)
-      ? { choices: [{ message: { content, reasoning_content: 'חשיבה' } }], usage: { prompt_tokens: 1200, completion_tokens: 120 } }
+      ? { choices: [{ message: { content: THINK_OPEN + 'חשיבה על {הטיוטה} ' + THINK_CLOSE + content, reasoning_content: 'חשיבה' } }], usage: { prompt_tokens: 1200, completion_tokens: 120 } }
       : { response: content };
     // A model that returns unparseable output must be surfaced, not reported as ok.
     if (rewriteMode === 'invalid') return envelope('not json');

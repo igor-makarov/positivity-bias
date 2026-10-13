@@ -7,6 +7,24 @@
 - Sessions/control are on `shurik-control/main`; iterations continue immediately
   (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
+## Verified (2026-10-13, iteration 2-17)
+
+35. **A Qwen3 reasoning wrapper around the JSON answer was treated as unparseable.**
+    Qwen3 is now the default rewrite model and it is a reasoning model: its chat template
+    emits a ` thinking...` block even when thinking is disabled (Qwen documents this), and
+    Workers AI normally returns the reasoning in a separate `reasoning_content` field. If
+    the wrapper instead arrives inline in `choices[].message.content`, the previous JSON
+    extraction began at a brace inside the reasoning and returned null, so every rewrite
+    was reported as `invalid_response` and no headline was ever produced. `parseJsonObject`
+    now strips a paired reasoning block before JSON parsing, so a reasoning wrapper (empty
+    or containing braces) can never hide the result; a truncated reasoning-only answer is
+    still unparseable and keeps the preserved original. No editorial/grounding policy
+    changed, so no fingerprint bump and no rewrite retirement. Verified: two new unit
+    tests (a braces-in-reasoning wrapper and an inline-wrapper rewrite-batch acceptance)
+    and the `npm run test:pipeline` Qwen3 mock now returns its answer inside an inline
+    reasoning block; all three were shown to fail against the pre-fix parser
+    (`invalid_response`) and pass after it. 65 unit tests pass.
+
 ## Verified (2026-10-13, iteration 2-16)
 
 33. **Default rewrite model switched to the available low-cost Qwen3.** Cloudflare's
@@ -394,16 +412,17 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Latest full validation (iteration 2-16): `npm run check`, **63 unit tests**,
+Latest full validation (iteration 2-17): `npm run check`, **65 unit tests**,
 `npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
 `npm run test:pipeline`, `npm run test:batch`, `npm run test:browser` and
 `npm run test:interaction` all pass, plus an end-to-end workerd run proving the new
 default `@cf/qwen/qwen3-30b-a3b-fp8` is selected without `REWRITE_MODEL` and its
-chat-shaped response is accepted and clef-verified (also asserted in
-`npm run test:pipeline`). Prior iteration 2-15 covered the
-noise-named layout-wrapper extraction regression (shown to fail pre-fix, pass after);
-iteration 2-14 added the current-fingerprint generated-headline rejection serve-time
-regression and the clef-decision-invariant unit/pipeline regressions.
+chat-shaped response (returned inside an inline Qwen3 reasoning wrapper) is accepted and
+clef-verified (also asserted in `npm run test:pipeline`). Iteration 2-17 fixed the
+inline-reasoning-wrapper parse failure (shown to fail pre-fix, pass after). Prior
+iteration 2-15 covered the noise-named layout-wrapper extraction regression (shown to
+fail pre-fix, pass after); iteration 2-14 added the current-fingerprint generated-headline
+rejection serve-time regression and the clef-decision-invariant unit/pipeline regressions.
 
 Live re-check (iteration 2-15): a 20-article live sample across ynet (news/sport/
 /economy), mako (culture) and Kan (politic/global/local) measured: ynet 12/12 `complete`

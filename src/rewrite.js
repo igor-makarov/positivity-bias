@@ -182,8 +182,19 @@ export function parseModelText(payload) {
   return '';
 }
 
+// Qwen3 is a reasoning model: its chat template wraps the answer in a ` thinking...`
+// block, and per Qwen's documentation it emits that block even when thinking is disabled
+// (the reasoning inside is then empty). Workers AI normally returns the reasoning in a
+// separate `reasoning_content` field, but if the wrapper arrives inline in the answer the
+// JSON extraction below would start at a brace inside the reasoning and fail, silently
+// turning every rewrite into an `invalid_response`. Strip the paired block first so a
+// reasoning wrapper can never hide the JSON result or confuse brace matching.
+function stripThinking(value) {
+  return String(value ?? '').replace(/<think\b[^>]*>[\s\S]*?<\/think\s*>/gi, ' ').trim();
+}
+
 export function parseJsonObject(value) {
-  const raw = typeof value === 'string' ? value : parseModelText(value);
+  const raw = stripThinking(typeof value === 'string' ? value : parseModelText(value));
   const trimmed = raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
   try { return JSON.parse(trimmed); } catch { /* fall through to brace extraction */ }
   const start = trimmed.indexOf('{'), end = trimmed.lastIndexOf('}');
