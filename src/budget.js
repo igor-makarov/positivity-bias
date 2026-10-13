@@ -10,7 +10,7 @@ import { MODEL_CONTEXT_TOKENS, modelNeuronRate } from './policy.js';
 
 export const DEFAULT_DAILY_NEURON_BUDGET = 6_000;
 export const MAX_DAILY_NEURON_BUDGET = 10_000;
-export const ESTIMATED_CHARS_PER_TOKEN = 2; // conservative for Hebrew + JSON wrappers
+export const ESTIMATED_CHARS_PER_TOKEN = 1.5; // deliberately conservative for Hebrew + JSON wrappers
 export const OUTPUT_TOKENS_PER_ITEM = 180; // one complete short headline (and one verdict)
 
 export function estimateTokens(value) {

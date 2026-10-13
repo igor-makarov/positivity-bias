@@ -5,16 +5,13 @@ articles, and a broad reading order that rotates categories and sources. Difficu
 news remains visible. No sentiment scoring, viral ranking, infinite scrolling,
 sensational imagery, or tracking.
 
-## Name proposals
+## Name
 
-| Name | Idea |
-| --- | --- |
-| **במבט** (provisional) | News in perspective; short and memorable |
-| **בקצרה** | A concise daily view |
-| **קו נקי** | Clear, restrained editorial phrasing |
-| **בלי רעש** | A direct promise of less sensational coverage |
-
-These are creative proposals; trademark/domain availability has not been checked.
+The chosen name is **במבט** — a short, memorable Hebrew name for "news in
+perspective". Hebrew taglines such as **חדשות בפרופורציה** and
+**אותן עובדות, פחות דרמה** carry the editorial promise. No English subtitle is
+shown in the header or any visitor-facing branding. This is a product name only;
+the repository, Worker and deployment identities are unchanged.
 
 ## Development
 
@@ -116,7 +113,8 @@ The archive retains up to 480 articles from the last 72 hours.
 
 The one-time `Start main loop` push workflow starts `main` using
 `igor-makarov/shurik@v1`, `opencode-go/deepseek-v4.1-flash`, high reasoning,
-`PROMPT.md`, a 600-second work budget and a 3600-second wait after each iteration.
+`PROMPT.md`, a 600-second work budget and `wait-seconds=0` so iterations continue
+immediately.
 It skips startup if `shurik-control/main` already exists. Only the iteration job
 receives the model key. Supported repository secret names are `OPENCODE_API_KEY`,
 `OCGO_API_KEY`, and `OPENCODE_GO_API_KEY` (the first set wins).

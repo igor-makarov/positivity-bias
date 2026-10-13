@@ -48,6 +48,27 @@ export function policyFingerprint(env = {}) {
   return `${model}|${validator}|${EDITORIAL_VERSION}|${CONTEXT_POLICY}|${VALIDATOR_VERSION}`;
 }
 
+// Stable, non-reversible fingerprint of the source facts a decision was made from.
+// Used to cache validation rejections without persisting any article text.
+export function sourceFingerprint(article) {
+  const value = `${article?.originalHeadline || ''}\u0001${article?.description || ''}`;
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16);
+}
+
+// An article needs a fresh rewrite unless it already carries a current-policy
+// decision for the same source content: an accepted rewrite, or a cached rejection.
+export function needsRewrite(article, fingerprint) {
+  if (article.rewriteFingerprint !== fingerprint) return true;
+  if (article.rewriteStatus === 'rewritten') return false;
+  if (article.rewriteStatus === 'rejected') return article.rewriteSource !== sourceFingerprint(article);
+  return true;
+}
+
 // A cached rewrite is trusted only when its fingerprint matches the active policy.
 // Anything else is removed: the preserved original headline returns to display and
 // the stale acceptance/verification metadata is dropped. Never touches article
@@ -55,10 +76,12 @@ export function policyFingerprint(env = {}) {
 export function retireStaleRewrites(articles, fingerprint) {
   let changed = false;
   const next = articles.map((article) => {
-    const hasRewrite = article.rewriteStatus === 'rewritten' || article.rewriteFingerprint != null;
-    if (!hasRewrite || (article.rewriteStatus === 'rewritten' && article.rewriteFingerprint === fingerprint)) return article;
+    const hasDecision = article.rewriteStatus === 'rewritten' || article.rewriteStatus === 'rejected' || article.rewriteFingerprint != null;
+    if (!hasDecision) return article;
+    if (article.rewriteFingerprint === fingerprint && article.rewriteStatus === 'rewritten') return article;
+    if (article.rewriteFingerprint === fingerprint && article.rewriteStatus === 'rejected' && article.rewriteSource === sourceFingerprint(article)) return article;
     changed = true;
-    const { rewriteFingerprint, verification, context, contextCompleteness, ...rest } = article;
+    const { rewriteFingerprint, rewriteSource, verification, context, contextCompleteness, ...rest } = article;
     return { ...rest, headline: article.originalHeadline, rewriteStatus: 'original' };
   });
   return { articles: changed ? next : articles, changed };
