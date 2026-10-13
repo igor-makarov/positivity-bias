@@ -122,6 +122,17 @@ function noulProbability(answer) {
   return Number.isFinite(probability) && probability >= 0 && probability <= 1 ? probability : null;
 }
 
+export function providerFailureReason(error) {
+  const message = typeof error?.message === 'string' ? error.message : '';
+  if (/subrequest/i.test(message)) return 'subrequest_limit';
+  if (/quota|neuron.*(?:limit|exhaust)|free.*(?:allocation|limit)/i.test(message)) return 'quota_exceeded';
+  if (/rate.?limit|too many requests|\b429\b/i.test(message)) return 'rate_limited';
+  if (/unauthori[sz]ed|forbidden|authentication|\b401\b|\b403\b/i.test(message)) return 'authorization';
+  if (/overload|busy|\b503\b/i.test(message)) return 'service_busy';
+  if (/invalid.*(?:input|schema|question)|(?:context|token|question).*(?:limit|exceed)/i.test(message)) return 'invalid_request';
+  return 'unavailable';
+}
+
 function parseClefAnswers(payload) {
   const answers = payload?.answers ?? payload?.result?.answers;
   return answers && typeof answers === 'object' ? answers : null;
@@ -301,7 +312,7 @@ export async function rewriteBatch(items, env, { model = env.REWRITE_MODEL || DE
   const user = JSON.stringify(requestItems);
   let payload, usage;
   try { ({ payload, usage } = await runModel(env, model, EDITORIAL_PROMPT, user, maxTokens ?? OUTPUT_TOKENS_PER_ITEM * items.length + 32, schema)); }
-  catch { return { candidates: [], evaluated: new Set(), status: 'provider_unavailable', usage: null }; }
+  catch (error) { return { candidates: [], evaluated: new Set(), status: 'provider_unavailable', failureReason: providerFailureReason(error), usage: null }; }
   const choices = payload?.choices ?? payload?.result?.choices ?? payload?.response?.choices;
   const finishReason = ['stop', 'length', 'content_filter'].includes(choices?.[0]?.finish_reason) ? choices[0].finish_reason : null;
   const message = choices?.[0]?.message;
@@ -358,15 +369,15 @@ export async function verifyBatch(candidates, env, { model = env.VALIDATOR_MODEL
   if (!isClefModel(model)) return { ...empty, status: 'validator_misconfigured' };
   const accepted = new Map(), rejected = new Set(), answered = new Set();
   let answerShape = null;
-  let usage = 0, completeUsage = true, failed = false;
+  let usage = 0, completeUsage = true, failed = false, failureReason = null;
   for (const chunk of planVerificationBatches(candidates, { model })) {
     let payload;
     try { payload = await env.AI.run(model, clefRequest(chunk)); }
-    catch { failed = true; break; }
+    catch (error) { failed = true; failureReason = providerFailureReason(error); break; }
     const actual = modelUsageNeurons(payload, model);
     if (actual == null) completeUsage = false; else usage += actual;
     const answers = parseClefAnswers(payload);
-    if (!answers) { failed = true; break; }
+    if (!answers) { failed = true; failureReason = 'invalid_response'; break; }
     chunk.forEach((candidate, index) => {
       answerShape ||= choiceShape(answers[`${index}_headline`], candidate);
       const answer = parseChoice(answers[`${index}_headline`], candidate);
@@ -391,5 +402,5 @@ export async function verifyBatch(candidates, env, { model = env.VALIDATOR_MODEL
   }
   const evaluated = new Set([...accepted.keys(), ...rejected]);
   const status = failed ? 'provider_unavailable' : accepted.size === candidates.length ? 'ok' : accepted.size ? 'partial' : 'rejected';
-  return { accepted, rejected, evaluated, answered, answerShape, status, usage: completeUsage && !failed ? usage : null };
+  return { accepted, rejected, evaluated, answered, answerShape, failureReason, status, usage: completeUsage && !failed ? usage : null };
 }

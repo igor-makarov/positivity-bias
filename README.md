@@ -113,9 +113,9 @@ conservative slice of the shared **10,000-neuron/day** free allocation
 call, reconciles it with provider-reported usage, and defers work instead of
 overspending. No billing upgrade, retries or automatic budget increase.
 
-Each edition processes the retained backlog in at most 14 finite chunks, with progress
-persisted between Durable Object alarms. Feed and article redirects share a counter
-below the Free plan's 50-external-request ceiling. Each article gets at most one model
+Each edition processes the retained backlog in at most 32 finite chunks, with progress
+persisted between Durable Object alarms. Publisher requests, redirects and native AI calls share a 48-request counter,
+with verification slots reserved before body fetches, below the Free plan ceiling. Each article gets at most one model
 attempt per edition. Inaccessible bodies wait a day before another fetch, so they do
 not starve untouched articles. Malformed/omitted model results preserve their own originals while unrelated backlog
 continues; provider failures and budget limits stop processing.

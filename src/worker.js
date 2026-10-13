@@ -128,7 +128,7 @@ export class NewsStore {
     snapshot.sources = statuses;
     await this.rewritePending(snapshot, now, publisherFetch);
     if (incoming.length) snapshot.updatedAt = snapshot.lastAttemptAt;
-    snapshot.rewriteContinuation = { policy: policyFingerprint(this.env), day: this.usageDay(now), roundsLeft: 13 };
+    snapshot.rewriteContinuation = { policy: policyFingerprint(this.env), day: this.usageDay(now), roundsLeft: 31 };
     await this.finishRewriteChunk(snapshot, now);
     return { state: 'complete', articles: snapshot.articles.length, rewriteStatus: snapshot.rewriteStatus,
       sources: statuses.map(({ id, state }) => ({ id, state })) };
@@ -185,9 +185,13 @@ export class NewsStore {
     const chars = contextChars(this.env);
     if (this.readUsage(this.usageDay(now)) >= dailyNeuronBudget(this.env)) { snapshot.rewriteStatus = 'budget_deferred'; return; }
     const pending = pendingArticles(snapshot.articles, fingerprint, now,
-      Math.min(maxContextFetches(this.env), publisherFetch.remaining()), Date.parse(snapshot.lastAttemptAt));
+      Math.min(maxContextFetches(this.env), Math.floor(publisherFetch.remaining() / 3)), Date.parse(snapshot.lastAttemptAt));
     diagnostics.contextCandidates += pending.length;
     if (!pending.length) { snapshot.rewriteStatus = 'ok'; return; }
+    // At most one rewrite and one verification call per article, even if each must
+    // stand alone. Publisher redirects cannot consume these reserved call slots.
+    publisherFetch.reserveModels(pending.length * 2);
+    const aiEnv = { ...this.env, AI: { run: (...args) => publisherFetch.modelCall(() => this.env.AI.run(...args)) } };
     // Fetch accessible article text once, bounded, so each request is sized from the
     // actual full-text input instead of a worst-case length. Missing context is not
     // cached and keeps the original headline.
@@ -231,7 +235,7 @@ export class NewsStore {
       const items = sized.map(({ article, context, completeness }) => ({ id: article.id, sourceName: article.sourceName,
         originalHeadline: article.originalHeadline, publishedAt: article.publishedAt,
         context, contextCompleteness: completeness }));
-      const rewrite = await rewriteBatch(items, this.env, { model });
+      const rewrite = await rewriteBatch(items, aiEnv, { model });
       diagnostics.rewriteCalls++;
       diagnostics.answered += rewrite.evaluated?.size ?? 0;
       diagnostics.proposed += rewrite.candidates.length;
@@ -242,6 +246,7 @@ export class NewsStore {
       diagnostics.reasoningChars += rewrite.envelope?.reasoningChars ?? 0;
       if (rewrite.envelope?.responseChannel) diagnostics.responseChannel = rewrite.envelope.responseChannel;
       if (rewrite.finishReason) diagnostics.finishReason = rewrite.finishReason;
+      if (rewrite.failureReason) diagnostics.providerFailureReason = rewrite.failureReason;
       if (rewrite.status === 'invalid_response' || (rewrite.evaluated?.size ?? 0) === 0) diagnostics.failureStage = 'rewrite';
       if (rewrite.status === 'invalid_response') invalidResponse = true;
       // A parseable response that answered none of the requested articles is a failed
@@ -254,13 +259,14 @@ export class NewsStore {
         break;
       }
       const verified = rewrite.candidates.length
-        ? await verifyBatch(rewrite.candidates, this.env, { model: validator })
+        ? await verifyBatch(rewrite.candidates, aiEnv, { model: validator })
         : { accepted: new Map(), rejected: new Set(), evaluated: new Set(), usage: null, status: 'rejected' };
       if (rewrite.candidates.length) diagnostics.validatorBatches++;
       diagnostics.verified += verified.evaluated?.size ?? 0;
       diagnostics.choiceAnswered += verified.answered?.size ?? 0;
       diagnostics.uncertainChoices += (verified.answered?.size ?? 0) - (verified.evaluated?.size ?? 0);
       if (verified.answerShape) diagnostics.choiceAnswerShape = verified.answerShape;
+      if (verified.failureReason) diagnostics.providerFailureReason = verified.failureReason;
       diagnostics.accepted += verified.accepted.size;
       if (rewrite.candidates.length && (verified.answered?.size ?? 0) === 0) diagnostics.failureStage = 'verification';
       // Unknown usage keeps its reservation; never treat absent provider usage as zero.

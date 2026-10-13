@@ -48,6 +48,18 @@ test('Publisher request accounting stops before the Free subrequest ceiling', as
   assert.equal(calls, 2); assert.equal(fetcher.remaining(), 0);
 });
 
+test('Publisher requests and native AI calls share the request ceiling with reserved verification slots', async () => {
+  let publisherCalls = 0, modelCalls = 0;
+  const fetcher = boundedPublisherFetch(async () => { publisherCalls++; }, 48);
+  fetcher.reserveModels(32);
+  for (let i = 0; i < 16; i++) await fetcher('https://publisher.test');
+  assert.throws(() => fetcher('https://publisher.test/redirect'), /subrequest_budget/);
+  for (let i = 0; i < 32; i++) await fetcher.modelCall(async () => { modelCalls++; });
+  assert.equal(publisherCalls + modelCalls, 48);
+  assert.throws(() => fetcher.modelCall(() => { modelCalls++; }), /subrequest_budget/);
+  assert.equal(modelCalls, 32);
+});
+
 test('Large context batches keep at most four full HTML loads active and preserve article order', async () => {
   let active = 0, peak = 0;
   const result = await mapConcurrently(Array.from({ length: 40 }, (_, i) => i), async (item) => {

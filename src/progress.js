@@ -21,14 +21,23 @@ export function pendingArticles(articles, fingerprint, now, limit, attemptedBefo
 
 // Reserve external-request headroom below Workers Free's 50/request ceiling.
 // Redirect hops pass through the same counter. This is shared by feed/body fetches.
-export function boundedPublisherFetch(fetcher, limit = 44) {
-  let used = 0;
+export function boundedPublisherFetch(fetcher, limit = 48) {
+  let used = 0, reservedModels = 0;
   const bounded = (...args) => {
-    if (used >= limit) throw new Error('subrequest_budget');
+    if (used >= limit - reservedModels) throw new Error('subrequest_budget');
     used++;
     return fetcher(...args);
   };
-  bounded.remaining = () => limit - used;
+  bounded.remaining = () => limit - used - reservedModels;
+  bounded.reserveModels = (count) => {
+    if (count < 0 || count > bounded.remaining()) throw new Error('subrequest_budget');
+    reservedModels += count;
+  };
+  bounded.modelCall = (run) => {
+    if (reservedModels < 1 || used >= limit) throw new Error('subrequest_budget');
+    reservedModels--; used++;
+    return run();
+  };
   return bounded;
 }
 

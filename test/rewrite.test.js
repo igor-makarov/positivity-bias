@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { acceptRewrite, CLEF_ACCEPT_PROBABILITY, CLEF_MAX_CANDIDATES, EDITORIAL_PROMPT, VERIFICATION_PROMPT,
-  modelUsageNeurons, parseJsonObject, parseModelText, planVerificationBatches, rewriteBatch, verifyBatch } from '../src/rewrite.js';
+  modelUsageNeurons, parseJsonObject, parseModelText, planVerificationBatches, providerFailureReason, rewriteBatch, verifyBatch } from '../src/rewrite.js';
 import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL } from '../src/policy.js';
 import { OUTPUT_TOKENS_PER_ITEM } from '../src/budget.js';
 
@@ -188,6 +188,12 @@ test('No AI, quota errors and expensive models preserve originals', async () => 
   const mustNotRun = { AI: { run: async () => assert.fail('expensive model executed') } };
   assert.equal((await rewriteBatch([base], mustNotRun, { model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' })).status, 'budget_guard');
   assert.equal((await verifyBatch([candidate()], mustNotRun, { model: '@cf/cloudflare/clef' })).status, 'validator_misconfigured');
+});
+test('Provider failure diagnostics reveal only bounded reasons, never private provider text', () => {
+  assert.equal(providerFailureReason(Error('Too many subrequests')), 'subrequest_limit');
+  assert.equal(providerFailureReason(Error('Neuron limit exceeded for this account')), 'quota_exceeded');
+  assert.equal(providerFailureReason(Error('429 Too many requests')), 'rate_limited');
+  assert.equal(providerFailureReason(Error('A private upstream response with secrets')), 'unavailable');
 });
 
 const document = JSON.stringify({ items: [output()] });
