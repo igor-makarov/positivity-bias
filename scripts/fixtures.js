@@ -18,3 +18,9 @@ export function createFixtureFetch() {
   };
   return { fetch, count: () => requests };
 }
+// Decode the documented native chat or Qwen raw format in test-only model fixtures.
+export function rewriteItems(input) {
+  const content = input.messages?.[1]?.content
+    ?? input.prompt?.match(/<\|im_start\|>user\n([\s\S]*?)<\|im_end\|>\n<\|im_start\|>assistant/)[1];
+  return JSON.parse(content);
+}

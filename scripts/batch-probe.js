@@ -2,6 +2,7 @@
 // model and records the size of every verification request, so the check can prove a
 // shared rewrite/verify batch never exceeds the validator's context window.
 import worker, { NewsStore } from '../src/worker.js';
+import { rewriteItems } from './fixtures.js';
 
 const VALIDATOR = '@cf/cloudflare/clef-flash';
 
@@ -20,8 +21,8 @@ function createMockAI() {
       return { model: 'clef-flash', answers, usage: { input_tokens: 2000, output_tokens: 0 } };
     }
     calls.rewrite++;
-    const items = JSON.parse(input.messages[1].content);
-    calls.maxRewriteChars = Math.max(calls.maxRewriteChars, input.messages[1].content.length);
+    const items = rewriteItems(input);
+    calls.maxRewriteChars = Math.max(calls.maxRewriteChars, JSON.stringify(items).length);
     // Echo the original headline: a faithful, dry candidate that the heuristics accept.
     return { response: JSON.stringify({ items: items.map((item) => ({ id: item.id, usable: true, headline: item.originalHeadline })) }) };
   };

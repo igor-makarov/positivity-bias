@@ -2,6 +2,7 @@
 // mock model into a real NewsStore so the refresh/rewrite/verify/budget orchestration
 // runs under workerd without any external inference.
 import worker, { NewsStore } from '../src/worker.js';
+import { rewriteItems } from './fixtures.js';
 
 const validatorDefault = '@cf/cloudflare/clef-flash';
 // Qwen3 wraps its answer in a reasoning block that its chat template emits even when
@@ -40,7 +41,7 @@ function createMockAI(validatorModel, rewriteMode, validatorMode) {
     if (rewriteMode === 'invalid') return envelope('not json');
     // Parseable JSON that answers none of the requested articles is also a failure.
     if (rewriteMode === 'empty') return envelope(JSON.stringify({ items: [] }));
-    const items = JSON.parse(input.messages[1].content);
+    const items = rewriteItems(input);
     // Simulate a model that silently drops an article: only the `/1` article is ever
     // answered, so `/2` is a model omission, not a rejection decision.
     if (rewriteMode === 'partial') {

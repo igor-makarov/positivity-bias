@@ -3,7 +3,7 @@
 // pipeline (or an older grounding/verification policy) can never be displayed.
 
 export const EDITORIAL_VERSION = 'editorial-v3';
-export const REWRITE_CONTRACT_VERSION = 'structured-ids-v2';
+export const REWRITE_CONTRACT_VERSION = 'structured-ids-v3';
 // v2: bounded HTMLRewriter body extraction with navigation/advertising/related removed.
 // v3: a noise-named layout wrapper (e.g. Bootstrap's "row navigation") wrapping the
 // whole page no longer suppresses <main>; live Kan article pages now yield a complete

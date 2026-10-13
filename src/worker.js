@@ -10,7 +10,8 @@ import { HOUR, refreshDue } from './refresh.js';
 const sources = validateWebsites(configuration);
 // A repaired policy may recover one failed rewrite attempt immediately. Persist
 // the policy before work, so repeated readers cannot bypass the hourly guard.
-const policyRecoveryDue = (snapshot, env) => ['invalid_response', 'provider_unavailable', 'validator_misconfigured'].includes(snapshot.rewriteStatus)
+const policyRecoveryDue = (snapshot, env) => (['invalid_response', 'provider_unavailable', 'validator_misconfigured'].includes(snapshot.rewriteStatus)
+  || Boolean(snapshot.rewriteDiagnostics?.failureStage))
   && snapshot.lastRefreshPolicy !== policyFingerprint(env);
 
 const json = (body, status = 200) => Response.json(body, { status, headers: {
@@ -247,7 +248,7 @@ export class NewsStore {
       if (verified.status === 'provider_unavailable' || verified.status === 'validator_misconfigured') { snapshot.rewriteStatus = verified.status; providerFailed = true; break; }
     }
     snapshot.rewriteStatus = providerFailed ? snapshot.rewriteStatus
-      : accepted ? 'ok' : invalidResponse ? 'invalid_response' : deferred ? 'budget_deferred' : 'ok';
+      : invalidResponse ? accepted ? 'partial' : 'invalid_response' : accepted ? 'ok' : deferred ? 'budget_deferred' : 'ok';
   }
 }
 

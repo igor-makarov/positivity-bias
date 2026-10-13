@@ -99,6 +99,9 @@ are restored to the original article identity before factual verification or sto
 The native binding's already-parsed JSON output is supported. Validation permits
 only Clef Flash. A changed policy can recover a failed pipeline once within the
 current refresh window, with its attempt and neuron reservation persisted before work.
+Qwen uses its documented raw chat format with a closed thinking prefix. A complete
+schema document returned through the alternate channel is still only a candidate;
+prose and truncated output are rejected, and no reasoning text is exposed or stored.
 
 Requests are sized adaptively from the actual full-text input, the context window,
 reserved output space and the remaining daily budget. The same context goes to both

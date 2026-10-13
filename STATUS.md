@@ -32,6 +32,20 @@
   context/budget batch splitting and cached-rewrite retirement. Native inference
   verification follows this deployment; mock success is not production evidence.
 
+### Native response-channel evidence and final request correction
+
+- Direct production evidence after the response-channel correction: refresh at
+  19:28 UTC reports all four publishers healthy, with 5 answered records, 4 candidates
+  evaluated by native Clef Flash and 1 accepted rewritten headline. Qwen returned
+  empty `content` and its structured JSON through the alternate channel. No reasoning
+  text was published. A second batch remained invalid, so full repair was not claimed.
+- Qwen now uses the documented raw chat format with its thinking prefix explicitly
+  closed before generation, preserving escaped source control tokens and the full
+  source context. Mixed success/failure now reports `partial` instead of hiding a
+  failed batch behind `ok`. The same daily budget and one-recovery-per-policy guard
+  remain in place. Verified: 73 unit tests, build and Worker pipeline/batch checks;
+  the final native result will be checked after deployment.
+
 ## Verified (2026-10-13, iteration 2-17)
 
 35. **A Qwen3 reasoning wrapper around the JSON answer was treated as unparseable.**

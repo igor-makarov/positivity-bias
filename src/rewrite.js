@@ -218,8 +218,16 @@ export function modelUsageNeurons(payload, model) {
 function buildInput(model, system, user, maxTokens, schema) {
   const input = { temperature: 0.1, max_tokens: maxTokens, response_format: { type: 'json_schema', json_schema: schema },
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }] };
-  // Qwen3 supports disabling its thinking phase; harmless to the chat template if absent.
-  if (/qwen3/i.test(model)) { input.chat_template_kwargs = { enable_thinking: false }; input.messages[0].content += '\n/no_think'; }
+  // Workers AI does not reliably pass chat_template_kwargs to Qwen's template.
+  // Its documented raw mode lets us close the thinking prefix before generation,
+  // so constrained JSON starts in the answer channel. Escape control-token text
+  // inside source JSON; decoding still preserves the complete source context.
+  if (/qwen3/i.test(model)) {
+    const source = user.replaceAll('<', '\\u003c').replaceAll('>', '\\u003e');
+    input.raw = true;
+    input.prompt = `<|im_start|>system\n${system}\n/no_think<|im_end|>\n<|im_start|>user\n${source}<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n`;
+    delete input.messages;
+  }
   return input;
 }
 
