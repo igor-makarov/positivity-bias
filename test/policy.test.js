@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CONTEXT_POLICY, EDITORIAL_VERSION, DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, VALIDATOR_VERSION, policyFingerprint, retireStaleRewrites } from '../src/policy.js';
+import { CONTEXT_POLICY, EDITORIAL_VERSION, DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, VALIDATOR_VERSION, needsRewrite, policyFingerprint, retireStaleRewrites, sourceFingerprint } from '../src/policy.js';
 
 const fingerprint = policyFingerprint({});
 const stale = { id: 'drone-1', url: 'https://www.ynet.co.il/news/article/1', sourceId: 'ynet', sourceName: 'ynet',
@@ -42,4 +42,23 @@ test('Retirement is idempotent and trusts a current-policy rewrite', () => {
   assert.equal(kept.changed, false);
   assert.equal(kept.articles[0].headline, stale.headline);
   assert.equal(kept.articles[0].rewriteStatus, 'rewritten');
+});
+
+test('Cached validation rejections are kept, invalidated by source changes, and never re-inferred', () => {
+  const rejected = { ...stale, headline: stale.originalHeadline, rewriteStatus: 'rejected',
+    rewriteFingerprint: fingerprint, rewriteSource: sourceFingerprint(stale) };
+  assert.equal(needsRewrite(rejected, fingerprint), false);
+  assert.equal(retireStaleRewrites([rejected], fingerprint).changed, false);
+  assert.equal(needsRewrite(rejected, 'other-policy'), true);
+  const corrected = { ...rejected, description: 'תיקון במקור' };
+  assert.equal(needsRewrite(corrected, fingerprint), true); // source changed: reprocess
+  const retired = retireStaleRewrites([corrected], fingerprint);
+  assert.equal(retired.changed, true);
+  assert.equal(retired.articles[0].rewriteStatus, 'original');
+  assert.equal(retired.articles[0].rewriteSource, undefined);
+});
+
+test('Source fingerprints are stable and content-sensitive', () => {
+  assert.equal(sourceFingerprint(stale), sourceFingerprint({ ...stale }));
+  assert.notEqual(sourceFingerprint(stale), sourceFingerprint({ ...stale, originalHeadline: 'אחר' }));
 });

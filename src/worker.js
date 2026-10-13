@@ -2,7 +2,7 @@ import configuration from '../websites.json';
 import { coverageOrder, mergeArticles, validateWebsites } from './news.js';
 import { ingestSource, loadArticleContext } from './ingest.js';
 import { DEFAULT_CONTEXT_CHARS } from './extract.js';
-import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, policyFingerprint, retireStaleRewrites } from './policy.js';
+import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, needsRewrite, policyFingerprint, retireStaleRewrites, sourceFingerprint } from './policy.js';
 import { rewriteBatch, verifyBatch } from './rewrite.js';
 import { OUTPUT_TOKENS_PER_ITEM, budgetDecision, dailyNeuronBudget, estimateNeurons, estimateTokens, planBatches } from './budget.js';
 
@@ -132,7 +132,7 @@ export class NewsStore {
     const validator = this.env.VALIDATOR_MODEL || DEFAULT_VALIDATOR_MODEL;
     if (!this.env.AI) { snapshot.rewriteStatus = 'not_configured'; return; }
     const chars = contextChars(this.env);
-    const pending = coverageOrder(snapshot.articles.filter((article) => article.rewriteStatus !== 'rewritten' || article.rewriteFingerprint !== fingerprint))
+    const pending = coverageOrder(snapshot.articles.filter((article) => needsRewrite(article, fingerprint)))
       .slice(0, maxContextFetches(this.env));
     if (!pending.length) { snapshot.rewriteStatus = 'ok'; return; }
     const batches = planBatches(pending.map((article) => ({ article, contextLength: chars })), { model });
@@ -173,6 +173,17 @@ export class NewsStore {
         if (article) { article.headline = headline; article.rewriteStatus = 'rewritten'; article.rewriteFingerprint = fingerprint; }
         accepted++;
       }
+      // Cache the validation decision for source-grounded rejections so the same
+      // articles are not re-fetched and re-inferred every refresh. Provider/parse
+      // failures and missing context are not cached and may be retried.
+      if (['ok', 'partial', 'rejected'].includes(rewrite.status) && ['ok', 'partial', 'rejected'].includes(verified.status)) {
+        for (const { article } of usable) {
+          if (verified.accepted.has(article.id)) continue;
+          article.rewriteStatus = 'rejected';
+          article.rewriteFingerprint = fingerprint;
+          article.rewriteSource = sourceFingerprint(article);
+        }
+      }
       if (verified.status === 'provider_unavailable') { snapshot.rewriteStatus = 'provider_unavailable'; providerFailed = true; break; }
     }
     snapshot.rewriteStatus = providerFailed ? snapshot.rewriteStatus
@@ -204,7 +215,8 @@ export default {
       const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(120, Math.floor(requestedLimit))) : 60;
       const offset = Math.max(0, Math.min(480, Number.parseInt(url.searchParams.get('offset') || '0', 10) || 0));
       return json({ ...publicStatus, categories: [...new Set(articles.flatMap((article) => article.categories))].sort((a, b) => a.localeCompare(b, 'he')),
-        total: selected.length, articles: selected.slice(offset, offset + limit).map(({ description, rewriteFingerprint, ...article }) => article) });
+        total: selected.length, articles: selected.slice(offset, offset + limit).map(({ description, rewriteFingerprint, rewriteSource, rewriteStatus, ...article }) => ({
+          ...article, rewriteStatus: rewriteStatus === 'rewritten' ? 'rewritten' : 'original' })) });
     } catch { return json({ error: 'temporarily_unavailable' }, 503); }
   },
   async scheduled(controller, env, context) {

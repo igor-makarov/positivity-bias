@@ -93,7 +93,7 @@ export function mergeArticles(previous, incoming, now = Date.now()) {
     const existing = articles.get(article.id);
     const sameContent = existing?.originalHeadline === article.originalHeadline && existing?.description === article.description;
     articles.set(article.id, sameContent ? { ...article, headline: existing.headline, rewriteStatus: existing.rewriteStatus,
-      rewriteFingerprint: existing.rewriteFingerprint } : article);
+      rewriteFingerprint: existing.rewriteFingerprint, rewriteSource: existing.rewriteSource } : article);
   }
   return coverageOrder([...articles.values()]).slice(0, 480);
 }

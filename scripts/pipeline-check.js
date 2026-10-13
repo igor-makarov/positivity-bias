@@ -60,6 +60,15 @@ try {
   const usage = await (await store.fetch(`https://news.internal/usage?day=${day}`)).json();
   assert.ok(usage.used > 0 && usage.used <= 6000, `unexpected usage ${usage.used}`);
 
+  // Cached decisions: a second refresh re-infers neither the accepted nor the rejected article.
+  const cachedSeed = await (await store.fetch('https://news.internal/snapshot')).json();
+  cachedSeed.lastAttemptAt = new Date(Date.now() - 2 * 3_600_000).toISOString();
+  const cached = await (await store.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: cachedSeed,
+    env: { REWRITE_MODEL: '@cf/meta/llama-3.1-8b-instruct-fp8-fast', VALIDATOR_MODEL: '@cf/cloudflare/clef-flash',
+      DAILY_NEURON_BUDGET: '6000', CONTEXT_CHARS: '6000', MAX_CONTEXT_FETCHES: '4' } }) })).json();
+  assert.equal(cached.calls.rewrite, 0);
+  assert.equal(cached.calls.verify, 0);
+
   // Budget deferral: no budget means no model calls and originals kept.
   const deferredSeed = { articles: [], updatedAt: null, lastAttemptAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
     policyFingerprint: null, rewriteStatus: 'not_configured', sources: [] };
