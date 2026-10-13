@@ -25,8 +25,8 @@
     "outcome": "running",
     "runId": "38421657242",
     "minEntryId": 472,
-    "maxEntryId": 768,
-    "checkpointAt": "2026-10-13T15:35:55.072Z",
+    "maxEntryId": 800,
+    "checkpointAt": "2026-10-13T15:37:08.968Z",
     "transcript": "checkpoint"
   }
 ]
