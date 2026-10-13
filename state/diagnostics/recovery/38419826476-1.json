@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "key": "38419826476-1",
+  "loopId": "main",
+  "runId": "38419826476",
+  "attempt": 1,
+  "generation": 1,
+  "iteration": 2,
+  "command": "iterate",
+  "conclusion": "failure",
+  "url": "https://github.com/igor-makarov/positivity-bias/actions/runs/38419826476",
+  "headSha": "859ea33f05ac42b3d7b210a9d97398309297bc08",
+  "startedAt": "2026-10-13T15:10:58Z",
+  "completedAt": "2026-10-13T15:14:12Z",
+  "collectedAt": "2026-10-13T15:14:26.556Z",
+  "interruptedOwner": true,
+  "jobs": [
+    {
+      "id": 115373905738,
+      "name": "iteration",
+      "conclusion": "failure",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run igor-makarov/shurik@v1",
+          "conclusion": "failure"
+        },
+        {
+          "number": 4,
+          "name": "Preserve emergency snapshot after publication failure",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Post Run igor-makarov/shurik@v1",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "log": {
+        "text": "-credentials-21f27b6f-8625-417e-a257-6b20d19f7f7a.config\n2026-10-13T15:11:04.9239112Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/positivity-bias/positivity-bias/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-21f27b6f-8625-417e-a257-6b20d19f7f7a.config\n2026-10-13T15:11:04.9270250Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-21f27b6f-8625-417e-a257-6b20d19f7f7a.config\n2026-10-13T15:11:04.9306050Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-21f27b6f-8625-417e-a257-6b20d19f7f7a.config\n2026-10-13T15:11:04.9329583Z ##[endgroup]\n2026-10-13T15:11:04.9330613Z ##[group]Fetching the repository\n2026-10-13T15:11:04.9337473Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*\n2026-10-13T15:11:05.5824489Z From https://github.com/igor-makarov/positivity-bias\n2026-10-13T15:11:05.5825952Z  * [new branch]      main                -> origin/main\n2026-10-13T15:11:05.5827283Z  * [new branch]      shurik-control/main -> origin/shurik-control/main\n2026-10-13T15:11:05.5834098Z [command]/usr/bin/git branch --list --remote origin/main\n2026-10-13T15:11:05.5859038Z   origin/main\n2026-10-13T15:11:05.5867268Z [command]/usr/bin/git rev-parse refs/remotes/origin/main\n2026-10-13T15:11:05.5889357Z 859ea33f05ac42b3d7b210a9d97398309297bc08\n2026-10-13T15:11:05.5892847Z ##[endgroup]\n2026-10-13T15:11:05.5894475Z ##[group]Determining the checkout info\n2026-10-13T15:11:05.5896176Z ##[endgroup]\n2026-10-13T15:11:05.5898955Z [command]/usr/bin/git sparse-checkout disable\n2026-10-13T15:11:05.5947324Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig\n2026-10-13T15:11:05.5973657Z ##[group]Checking out the ref\n2026-10-13T15:11:05.5977297Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main\n2026-10-13T15:11:05.6046686Z Switched to a new branch 'main'\n2026-10-13T15:11:05.6049804Z branch 'main' set up to track 'origin/main'.\n2026-10-13T15:11:05.6058528Z ##[endgroup]\n2026-10-13T15:11:05.6091989Z [command]/usr/bin/git log -1 --format=%H\n2026-10-13T15:11:05.6115095Z 859ea33f05ac42b3d7b210a9d97398309297bc08\n2026-10-13T15:11:05.6124314Z ##[group]Removing auth\n2026-10-13T15:11:05.6125592Z Removing SSH command configuration\n2026-10-13T15:11:05.6127560Z [command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n2026-10-13T15:11:05.6156715Z [command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n2026-10-13T15:11:05.6337309Z Removing HTTP extra header\n2026-10-13T15:11:05.6341087Z [command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\n2026-10-13T15:11:05.6369422Z [command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n2026-10-13T15:11:05.6541856Z Removing includeIf entries pointing to credentials config files\n2026-10-13T15:11:05.6546293Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n2026-10-13T15:11:05.6570987Z includeif.gitdir:/home/runner/work/positivity-bias/positivity-bias/.git.path\n2026-10-13T15:11:05.6573546Z includeif.gitdir:/home/runner/work/positivity-bias/positivity-bias/.git/worktrees/*.path\n2026-10-13T15:11:05.6576057Z includeif.gitdir:/github/workspace/.git.path\n2026-10-13T15:11:05.6577676Z includeif.gitdir:/github/workspace/.git/worktrees/*.path\n2026-10-13T15:11:05.6581972Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/positivity-bias/positivity-bias/.git.path\n2026-10-13T15:11:05.6600989Z /home/runner/work/_temp/git-credentials-21f27b6f-8625-417e-a257-6b20d19f7f7a.config\n2026-10-13T15:11:05.6611908Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/positivity-bias/positivity-bias/.git.path /home/runner/work/_temp/git-credentials-21f27b6f-8625-417e-a257-6b20d19f7f7a.config\n2026-10-13T15:11:05.6642014Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/positivity-bias/positivity-bias/.git/worktrees/*.path\n2026-10-13T15:11:05.6661083Z /home/runner/work/_temp/git-credentials-21f27b6f-8625-417e-a257-6b20d19f7f7a.config\n2026-10-13T15:11:05.6670301Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/positivity-bias/positivity-bias/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-21f27b6f-8625-417e-a257-6b20d19f7f7a.config\n2026-10-13T15:11:05.6700789Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path\n2026-10-13T15:11:05.6758240Z /github/runner_temp/git-credentials-21f27b6f-8625-417e-a257-6b20d19f7f7a.config\n2026-10-13T15:11:05.6767886Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-21f27b6f-8625-417e-a257-6b20d19f7f7a.config\n2026-10-13T15:11:05.6796008Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path\n2026-10-13T15:11:05.6814687Z /github/runner_temp/git-credentials-21f27b6f-8625-417e-a257-6b20d19f7f7a.config\n2026-10-13T15:11:05.6821800Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-21f27b6f-8625-417e-a257-6b20d19f7f7a.config\n2026-10-13T15:11:05.6850353Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\n2026-10-13T15:11:05.7022055Z Removing credentials config '/home/runner/work/_temp/git-credentials-21f27b6f-8625-417e-a257-6b20d19f7f7a.config'\n2026-10-13T15:11:05.7030840Z ##[endgroup]\n2026-10-13T15:11:05.7518204Z ##[group]Run igor-makarov/shurik@v1\n2026-10-13T15:11:05.7518998Z with:\n2026-10-13T15:11:05.7519512Z   command: iterate\n2026-10-13T15:11:05.7520878Z   inputs: {\n  \"command\": \"iterate\",\n  \"loop_id\": \"main\",\n  \"reasoning\": \"high\",\n  \"create_pr\": \"auto\",\n  \"generation\": \"1\",\n  \"iteration\": \"2\"\n}\n2026-10-13T15:11:05.7522387Z   workflow: shurik.yml\n2026-10-13T15:11:05.7528871Z   token: ***\n2026-10-13T15:11:05.7529460Z env:\n2026-10-13T15:11:05.7529950Z   OPENAI_API_KEY: \n2026-10-13T15:11:05.7530556Z   ANTHROPIC_API_KEY: \n2026-10-13T15:11:05.7531462Z   OPENCODE_API_KEY: ***\n2026-10-13T15:11:05.7532099Z ##[endgroup]\n2026-10-13T15:11:05.7589931Z ##[start-action display=Run actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38;id=shurik.__actions_setup-node]\n2026-10-13T15:11:05.7706803Z ##[group]Run actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38\n2026-10-13T15:11:05.7707855Z with:\n2026-10-13T15:11:05.7708404Z   node-version: 24.14.0\n2026-10-13T15:11:05.7709128Z   check-latest: false\n2026-10-13T15:11:05.7715540Z   token: ***\n2026-10-13T15:11:05.7716130Z   package-manager-cache: true\n2026-10-13T15:11:05.7716903Z env:\n2026-10-13T15:11:05.7717387Z   OPENAI_API_KEY: \n2026-10-13T15:11:05.7717985Z   ANTHROPIC_API_KEY: \n2026-10-13T15:11:05.7718912Z   OPENCODE_API_KEY: ***\n2026-10-13T15:11:05.7719497Z ##[endgroup]\n2026-10-13T15:11:05.9007549Z Attempting to download 24.14.0...\n2026-10-13T15:11:06.9396395Z Acquiring 24.14.0 - x64 from https://github.com/actions/node-versions/releases/download/24.14.0-22380502845/node-24.14.0-linux-x64.tar.gz\n2026-10-13T15:11:07.5137132Z Extracting ...\n2026-10-13T15:11:07.5239525Z [command]/usr/bin/tar xz --strip 1 --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/1758b560-7bb5-4f7c-9951-3a5d1b4f3d77 -f /home/runner/work/_temp/680aea3e-b766-4726-a814-c6699c44125e\n2026-10-13T15:11:08.7458583Z Adding to the cache ...\n2026-10-13T15:11:10.6596360Z ##[group]Environment details\n2026-10-13T15:11:10.8673480Z node: v24.14.0\n2026-10-13T15:11:10.8673987Z npm: 11.9.0\n2026-10-13T15:11:10.8674282Z yarn: 1.22.22\n2026-10-13T15:11:10.8674913Z ##[endgroup]\n2026-10-13T15:11:10.8769648Z ##[end-action id=shurik.__actions_setup-node;outcome=success;conclusion=success;duration_ms=5117]\n2026-10-13T15:11:10.8785207Z ##[start-action display=Run Shurik CLI;id=shurik.shurik]\n2026-10-13T15:11:10.8821504Z ##[group]Run node \"$SHURIK_ACTION_PATH/action/run.ts\"\n2026-10-13T15:11:10.8822044Z \u001b[36;1mnode \"$SHURIK_ACTION_PATH/action/run.ts\"\u001b[0m\n2026-10-13T15:11:10.9005687Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}\n2026-10-13T15:11:10.9006430Z env:\n2026-10-13T15:11:10.9006730Z   OPENAI_API_KEY: \n2026-10-13T15:11:10.9007039Z   ANTHROPIC_API_KEY: \n2026-10-13T15:11:10.9007746Z   OPENCODE_API_KEY: ***\n2026-10-13T15:11:10.9008139Z   SHURIK_ACTION_PATH: /home/runner/work/_actions/igor-makarov/shurik/v1\n2026-10-13T15:11:10.9008626Z   SHURIK_ACTION_REPOSITORY: igor-makarov/shurik\n2026-10-13T15:11:10.9008951Z   SHURIK_ACTION_REF: v1\n2026-10-13T15:11:10.9009537Z   SHURIK_INPUTS: {\n  \"command\": \"iterate\",\n  \"loop_id\": \"main\",\n  \"reasoning\": \"high\",\n  \"create_pr\": \"auto\",\n  \"generation\": \"1\",\n  \"iteration\": \"2\"\n}\n2026-10-13T15:11:10.9010086Z   SHURIK_COMMAND: iterate\n2026-10-13T15:11:10.9010381Z   SHURIK_LOOP_ID: \n2026-10-13T15:11:10.9010717Z   SHURIK_PROVIDER: \n2026-10-13T15:11:10.9010969Z   SHURIK_MODEL: \n2026-10-13T15:11:10.9011271Z   SHURIK_PROMPT: \n2026-10-13T15:11:10.9011542Z   SHURIK_CHECKPOINT_SECONDS: \n2026-10-13T15:11:10.9011844Z   SHURIK_CHECKPOINT_PATHS: \n2026-10-13T15:11:10.9012179Z   SHURIK_REASONING: \n2026-10-13T15:11:10.9012512Z   SHURIK_CREATE_PR: \n2026-10-13T15:11:10.9013035Z   SHURIK_SECONDS: \n2026-10-13T15:11:10.9013310Z   SHURIK_WORK_SECONDS: \n2026-10-13T15:11:10.9013595Z   SHURIK_WAIT_SECONDS: \n2026-10-13T15:11:10.9013928Z   SHURIK_DEADLINE: \n2026-10-13T15:11:10.9014222Z   SHURIK_SOURCE_REF: \n2026-10-13T15:11:10.9014537Z   SHURIK_GENERATION: \n2026-10-13T15:11:10.9014864Z   SHURIK_ITERATION: \n2026-10-13T15:11:10.9015191Z   SHURIK_WORKFLOW: shurik.yml\n2026-10-13T15:11:10.9017614Z   GITHUB_TOKEN: ***\n2026-10-13T15:11:10.9017935Z ##[endgroup]\n2026-10-13T15:14:06.5121949Z Emergency snapshot: /home/runner/.shurik/emergency/igor-makarov/positivity-bias/main/38419826476-1\n2026-10-13T15:14:06.5124192Z Error: Command failed: git push --atomic origin 3e6fd1b65fc95c29eb981590d797bbee50c81fb6:refs/heads/shurik-control/main 859ea33f05ac42b3d7b210a9d97398309297bc08:refs/heads/main\n2026-10-13T15:14:06.5125294Z error: atomic push failed for ref refs/heads/main. status: 5\n2026-10-13T15:14:06.5125969Z To https://github.com/igor-makarov/positivity-bias.git\n2026-10-13T15:14:06.5126755Z  ! [rejected]        859ea33f05ac42b3d7b210a9d97398309297bc08 -> main (fetch first)\n2026-10-13T15:14:06.5127661Z error: failed to push some refs to 'https://github.com/igor-makarov/positivity-bias.git'\n2026-10-13T15:14:06.5128632Z hint: Updates were rejected because the remote contains work that you do not\n2026-10-13T15:14:06.5129490Z hint: have locally. This is usually caused by another repository pushing to\n2026-10-13T15:14:06.5130354Z hint: the same ref. If you want to integrate the remote changes, use\n2026-10-13T15:14:06.5131032Z hint: 'git pull' before pushing again.\n2026-10-13T15:14:06.5131666Z hint: See the 'Note about fast-forwards' in 'git push --help' for details.\n2026-10-13T15:14:06.5132144Z \n2026-10-13T15:14:06.5240162Z ##[error]Process completed with exit code 1.\n2026-10-13T15:14:06.5269224Z ##[end-action id=shurik.shurik;outcome=failure;conclusion=failure;duration_ms=175648]\n2026-10-13T15:14:06.5399584Z ##[group]Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02\n2026-10-13T15:14:06.5400080Z with:\n2026-10-13T15:14:06.5400390Z   name: shurik-emergency-38419826476\n2026-10-13T15:14:06.5400883Z   path: /home/runner/.shurik/emergency/igor-makarov/positivity-bias/main/38419826476-1\n2026-10-13T15:14:06.5401393Z   include-hidden-files: true\n2026-10-13T15:14:06.5401759Z   if-no-files-found: ignore\n2026-10-13T15:14:06.5402083Z   retention-days: 7\n2026-10-13T15:14:06.5402377Z   compression-level: 6\n2026-10-13T15:14:06.5402947Z   overwrite: false\n2026-10-13T15:14:06.5403286Z ##[endgroup]\n2026-10-13T15:14:06.6905143Z (node:3286) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n2026-10-13T15:14:06.6906583Z (Use `node --trace-deprecation ...` to show where the warning was created)\n2026-10-13T15:14:06.7025073Z With the provided path, there will be 44 files uploaded\n2026-10-13T15:14:06.7029144Z Artifact name is valid!\n2026-10-13T15:14:06.7030075Z Root directory input is valid!\n2026-10-13T15:14:06.9924381Z Beginning upload of artifact content to blob storage\n2026-10-13T15:14:07.0961763Z (node:3286) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n2026-10-13T15:14:07.3831943Z Uploaded bytes 489029\n2026-10-13T15:14:07.4246896Z Finished uploading artifact content to blob storage!\n2026-10-13T15:14:07.4248374Z SHA256 digest of uploaded artifact zip is 4a747a70b5fab46d334d3e03d8463bc412110036301fcbee97c8879da22de488\n2026-10-13T15:14:07.4249180Z Finalizing artifact upload\n2026-10-13T15:14:07.7101760Z Artifact shurik-emergency-38419826476.zip successfully finalized. Artifact ID 11826536824\n2026-10-13T15:14:07.7103550Z Artifact shurik-emergency-38419826476 has been successfully uploaded! Final size is 489029 bytes. Artifact ID is 11826536824\n2026-10-13T15:14:07.7109210Z Artifact download URL: https://github.com/igor-makarov/positivity-bias/actions/runs/38419826476/artifacts/11826536824\n2026-10-13T15:14:07.7332621Z Post job cleanup.\n2026-10-13T15:14:07.7337631Z ##[start-action display=Run actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38;id=__5fe9fc7f-1751-4e50-818c-5346c3d0ae58.__actions_setup-node]\n2026-10-13T15:14:07.7342019Z ##[end-action id=__5fe9fc7f-1751-4e50-818c-5346c3d0ae58.__actions_setup-node;outcome=skipped;conclusion=skipped;duration_ms=0]\n2026-10-13T15:14:07.7414973Z Post job cleanup.\n2026-10-13T15:14:07.8234039Z [command]/usr/bin/git version\n2026-10-13T15:14:07.8263678Z git version 2.55.0\n2026-10-13T15:14:07.8306057Z Temporarily overriding HOME='/home/runner/work/_temp/9cb30a27-55eb-4de8-bd62-1ec588609e5a' before making global git config changes\n2026-10-13T15:14:07.8307340Z Adding repository directory to the temporary git global config as a safe directory\n2026-10-13T15:14:07.8312487Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/positivity-bias/positivity-bias\n2026-10-13T15:14:07.8343014Z Removing SSH command configuration\n2026-10-13T15:14:07.8350139Z [command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n2026-10-13T15:14:07.8382208Z [command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n2026-10-13T15:14:07.8578800Z Removing HTTP extra header\n2026-10-13T15:14:07.8583627Z [command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\n2026-10-13T15:14:07.8612559Z [command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n2026-10-13T15:14:07.8802028Z Removing includeIf entries pointing to credentials config files\n2026-10-13T15:14:07.8808464Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n2026-10-13T15:14:07.8836754Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\n2026-10-13T15:14:07.9177922Z Cleaning up orphan processes\n2026-10-13T15:14:07.9430967Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n",
+        "truncated": true,
+        "downloadLimited": false
+      }
+    },
+    {
+      "id": 115373908400,
+      "name": "control",
+      "conclusion": "skipped",
+      "steps": [],
+      "logUnavailable": "Error: GitHub job logs: 404"
+    },
+    {
+      "id": 115375533963,
+      "name": "recovery",
+      "conclusion": null,
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run igor-makarov/shurik@v1",
+          "conclusion": null
+        },
+        {
+          "number": 5,
+          "name": "Post Run igor-makarov/shurik@v1",
+          "conclusion": null
+        },
+        {
+          "number": 6,
+          "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+          "conclusion": null
+        }
+      ],
+      "logUnavailable": "Error: GitHub job logs: 404"
+    }
+  ],
+  "jobsTruncated": false
+}

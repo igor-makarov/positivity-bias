@@ -5,7 +5,7 @@
   "generation": 1,
   "iteration": 2,
   "startedAt": "2026-10-13T15:11:15.657Z",
-  "outcome": "running",
+  "outcome": "interrupted",
   "source": "859ea33f05ac42b3d7b210a9d97398309297bc08",
   "runtime": "a637cd4b71137ca58960dda0bbb0dd487064810d",
   "provider": "opencode-go",
@@ -14,5 +14,7 @@
   "workCommit": "859ea33f05ac42b3d7b210a9d97398309297bc08",
   "minEntryId": 409,
   "maxEntryId": 471,
-  "checkpointAt": "2026-10-13T15:12:33.166Z"
+  "checkpointAt": "2026-10-13T15:12:33.166Z",
+  "error": "Actions run ended before final publication (failure); recovered from latest committed checkpoint.",
+  "recovery": "diagnostics/recovery/38419826476-1.json"
 }
