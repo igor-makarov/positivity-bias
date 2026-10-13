@@ -38,7 +38,11 @@ try {
     originalHeadline: 'המועצה אישרה 7 תוכניות חדשות',
     headline: 'המועצה דחתה 7 תוכניות חדשות',
     categories: ['חדשות'], publishedAt: new Date(Date.now() - 60_000).toISOString(), description: 'תיאור' };
-  const seeded = { articles: [article, orphan], updatedAt: now, lastAttemptAt: now,
+  // A snapshot that lost the generated headline entirely must still restore the original.
+  const headless = { id: 'headless-3', url: 'https://www.ynet.co.il/news/article/3', sourceId: 'ynet', sourceName: 'ynet',
+    originalHeadline: 'הצעת החוק אושרה בקריאה ראשונה', categories: ['חדשות'],
+    publishedAt: new Date(Date.now() - 120_000).toISOString(), description: 'תיאור' };
+  const seeded = { articles: [article, orphan, headless], updatedAt: now, lastAttemptAt: now,
     rewriteStatus: 'ok', sources: [] };
   assert.equal(seeded.policyFingerprint, undefined); // the old snapshot had no policy fingerprint
   const seed = await store.fetch('https://news.internal/seed', { method: 'POST', body: JSON.stringify(seeded) });
@@ -54,6 +58,9 @@ try {
   const orphanServed = byId.get(orphan.id);
   assert.equal(orphanServed.headline, orphan.originalHeadline); // no fingerprint: never served
   assert.equal(orphanServed.rewriteStatus, 'original');
+  const headlessServed = byId.get(headless.id);
+  assert.equal(headlessServed.headline, headless.originalHeadline); // lost headline restored, never empty
+  assert.equal(headlessServed.rewriteStatus, 'original');
 
   // The idempotent migration persisted: a later read still shows the originals.
   const again = await (await store.fetch('https://news.internal/snapshot')).json();

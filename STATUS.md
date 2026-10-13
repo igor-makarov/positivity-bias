@@ -23,6 +23,15 @@
     The new integration assertion was shown to fail against the pre-fix per-batch gate
     (0 rewrite calls) and pass after the fix. Existing budget=0 deferral, full-budget
     throughput, retirement and reprocessing behaviour is unchanged.
+17. **Lost-headline retirement hardening.** `retireStaleRewrites` only treated a stored
+    headline as untrusted when it was a string that differed from the original, so a
+    legacy/partial snapshot whose generated `headline` was missing (and had no
+    status/fingerprint) was served with `headline: undefined` instead of the preserved
+    original, violating the display invariant (and `mergeArticles` could propagate the
+    missing headline). Any article whose stored headline is missing or differs from the
+    preserved original is now retired to the original. New unit and
+    `npm run test:retirement` regressions cover a headless article and were shown to
+    fail against the pre-fix logic and pass after it.
 
 ## Verified (2026-10-13, iteration 2-7)
 
@@ -157,8 +166,9 @@ Latest full validation (iteration 2-8): `npm run check`, **50 unit tests**,
 `npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
 `npm run test:pipeline` (mock model end-to-end + retire/reprocess), `npm run test:batch`
 (validator-window splitting + budget-aware reduction), `npm run test:browser` and
-`npm run test:interaction` all pass. The budget-aware batch regression was shown to
-fail against the pre-fix logic and pass after it. (Iteration 2-5 ran the full battery twice.)
+`npm run test:interaction` all pass. The budget-aware batch and lost-headline
+retirement regressions were each shown to fail against the pre-fix logic and pass
+after it. (Iteration 2-5 ran the full battery twice.)
 
 ## Blocked / needs input
 

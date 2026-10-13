@@ -83,4 +83,10 @@ test('A generated headline with no status or fingerprint is still retired as unt
   const current = { ...legacy, rewriteStatus: 'rewritten', rewriteFingerprint: fingerprint };
   assert.equal(retireStaleRewrites([current], fingerprint).changed, false);
   assert.equal(retireStaleRewrites([current], fingerprint).articles[0].headline, legacy.headline);
+  // A lost/empty generated headline must never be served either: restore the original.
+  const headless = { ...legacy, headline: undefined, rewriteStatus: 'original' };
+  const restored = retireStaleRewrites([headless], fingerprint);
+  assert.equal(restored.changed, true);
+  assert.equal(restored.articles[0].headline, legacy.originalHeadline);
+  assert.equal(restored.articles[0].rewriteStatus, 'original');
 });

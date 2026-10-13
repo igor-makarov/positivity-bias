@@ -76,11 +76,12 @@ export function needsRewrite(article, fingerprint) {
 export function retireStaleRewrites(articles, fingerprint) {
   let changed = false;
   const next = articles.map((article) => {
-    // A stored headline that differs from the preserved original is a generated
-    // rewrite even when the legacy snapshot lost its status/fingerprint. Such an
-    // untrusted headline must never be served, so treat it as a decision to retire.
-    const generated = typeof article.headline === 'string' && typeof article.originalHeadline === 'string'
-      && article.headline !== article.originalHeadline;
+    // A stored headline that is missing or differs from the preserved original is a
+    // generated rewrite even when the legacy snapshot lost its status/fingerprint. Such
+    // an untrusted headline must never be served, so treat it as a decision to retire
+    // and restore the preserved original (never serve an empty headline).
+    const generated = typeof article.originalHeadline === 'string'
+      && (typeof article.headline !== 'string' || article.headline !== article.originalHeadline);
     const hasDecision = article.rewriteStatus === 'rewritten' || article.rewriteStatus === 'rejected'
       || article.rewriteFingerprint != null || generated;
     if (!hasDecision) return article;
