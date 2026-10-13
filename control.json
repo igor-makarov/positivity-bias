@@ -15,7 +15,7 @@
   "workflow": "shurik.yml",
   "layoutVersion": 1,
   "prompt": "PROMPT.md",
-  "checkpointSeconds": 60,
+  "checkpointSeconds": 900,
   "checkpointPaths": [],
   "owner": {
     "runId": "38424683837",
