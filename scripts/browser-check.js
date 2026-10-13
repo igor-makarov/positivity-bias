@@ -3,17 +3,17 @@
 // No external traffic and no live data; fixtures only exist under Miniflare.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import net from 'node:net';
 import { Miniflare, convertV4MiniflareOptions, Log, LogLevel } from 'miniflare';
 import { createFixtureFetch } from './fixtures.js';
+import { requireFreshBundle } from './bundle-guard.js';
 
 const browser = ['chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable']
   .find((name) => spawnSync('which', [name]).status === 0);
 if (!browser) { console.error('No Chromium/Chrome binary found on PATH; browser check skipped. Install one to run this check.'); process.exit(2); }
-if (!existsSync('dist/worker.js')) { console.error('dist/worker.js is missing; run `npm run build` before `npm run test:browser`.'); process.exit(2); }
+requireFreshBundle('npm run test:browser');
 
 const port = await new Promise((resolve) => {
   const server = net.createServer();

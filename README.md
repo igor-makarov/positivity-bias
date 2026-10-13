@@ -23,12 +23,15 @@ npm run dev
 npm run check
 npm test
 npm run build
-npm run test:worker   # Miniflare runtime check with fictional fixtures (build first)
-npm run test:browser  # headless Chromium render check (build first, needs Chromium on PATH)
-npm run test:interaction  # keyboard/interaction QA in headless Chromium (build first)
+npm run test:worker   # Miniflare runtime check with fictional fixtures (builds first)
+npm run test:browser  # headless Chromium render check (builds first, needs Chromium on PATH)
+npm run test:interaction  # keyboard/interaction QA in headless Chromium (builds first)
 ```
 
-`build` bundles the Worker with Wrangler's dry run; it does not publish. Live
+The three `dist`-based checks rebuild the bundle first and refuse to run against a
+missing or stale `dist/worker.js`, so a runtime check always exercises the current
+source rather than an old build. `build` bundles the Worker with Wrangler's dry run;
+it does not publish. Live
 headlines are never replaced with sample articles. The first request starts a
 bounded background refresh; reload after it finishes. Wrangler local development
 needs outbound access to the publisher hosts for live aggregation. Additional

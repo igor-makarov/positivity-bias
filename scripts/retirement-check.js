@@ -6,6 +6,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { DEFAULT_REWRITE_MODEL } from '../src/policy.js';
 
 const directory = await mkdtemp(join(process.cwd(), '.probe-'));
 const outfile = join(directory, 'probe.js');
@@ -22,13 +23,18 @@ try {
   const namespace = await mf.getDurableObjectNamespace('NEWS');
   const store = namespace.get(namespace.idFromName('edition'));
   const now = new Date().toISOString();
+  // Mirror the real pre-correction (bootstrap) snapshot: the old pipeline stored
+  // `<model>:editorial-v2` on each rewrite and no snapshot-level policy fingerprint.
+  // The correction must retire exactly that state on first serve, without inference.
+  const legacyFingerprint = `${DEFAULT_REWRITE_MODEL}:editorial-v2`;
   const article = { id: 'drone-1', url: 'https://www.ynet.co.il/news/article/1', sourceId: 'ynet', sourceName: 'ynet',
     originalHeadline: 'התעשייה האווירית השלימה בהצלחה ניסוי במל״ט שמצויד במקלע',
     headline: 'תעשייה אווירית: ניסוי במל״ט עם מקלע נכשל', rewriteStatus: 'rewritten',
-    rewriteFingerprint: 'old-policy', verification: { supported: true }, context: 'x'.repeat(4000),
+    rewriteFingerprint: legacyFingerprint, verification: { supported: true }, context: 'x'.repeat(4000),
     categories: ['חדשות'], publishedAt: now, description: 'תיאור' };
-  const seeded = { articles: [article], updatedAt: now, lastAttemptAt: now, policyFingerprint: 'old-policy',
+  const seeded = { articles: [article], updatedAt: now, lastAttemptAt: now,
     rewriteStatus: 'ok', sources: [] };
+  assert.equal(seeded.policyFingerprint, undefined); // the old snapshot had no policy fingerprint
   const seed = await store.fetch('https://news.internal/seed', { method: 'POST', body: JSON.stringify(seeded) });
   assert.equal(seed.status, 200);
 
@@ -43,6 +49,7 @@ try {
   const again = await (await store.fetch('https://news.internal/snapshot')).json();
   assert.equal(again.articles[0].headline, article.originalHeadline);
   assert.equal(again.articles[0].rewriteFingerprint, undefined);
-  assert.notEqual(again.policyFingerprint, 'old-policy');
+  assert.ok(again.policyFingerprint);
+  assert.notEqual(again.policyFingerprint, legacyFingerprint);
   console.log('Retirement passed: a stale cached headline is never served and the migration persists without inference.');
 } finally { await mf.dispose().catch(() => {}); await rm(directory, { recursive: true, force: true }).catch(() => {}); }

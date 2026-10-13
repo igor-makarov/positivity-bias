@@ -2,6 +2,10 @@
 import assert from 'node:assert/strict';
 import { Miniflare, convertV4MiniflareOptions, Log, LogLevel } from 'miniflare';
 import { createFixtureFetch } from './fixtures.js';
+import { requireFreshBundle } from './bundle-guard.js';
+
+// Never validate a stale or missing bundle as if it were the current source.
+requireFreshBundle('node scripts/smoke.js');
 
 const fixture = createFixtureFetch();
 

@@ -10,13 +10,13 @@
     "check": "node scripts/check.js",
     "build": "wrangler deploy --dry-run --outdir dist",
     "deploy": "wrangler deploy",
-    "test:worker": "node scripts/smoke.js",
+    "test:worker": "npm run build && node scripts/smoke.js",
     "test:extract": "node scripts/extraction-check.js",
     "test:retirement": "node scripts/retirement-check.js",
     "test:pipeline": "node scripts/pipeline-check.js",
     "test:batch": "node scripts/batch-check.js",
-    "test:browser": "node scripts/browser-check.js",
-    "test:interaction": "node scripts/interaction-check.js"
+    "test:browser": "npm run build && node scripts/browser-check.js",
+    "test:interaction": "npm run build && node scripts/interaction-check.js"
   },
   "dependencies": { "fast-xml-parser": "5.11.2" },
   "devDependencies": { "wrangler": "4.150.0", "miniflare": "5.20261006.2-beta" }

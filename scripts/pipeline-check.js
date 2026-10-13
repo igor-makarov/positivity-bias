@@ -78,5 +78,28 @@ try {
   assert.equal(deferred.result.rewriteStatus, 'budget_deferred');
   assert.equal(deferred.calls.rewrite, 0);
   assert.equal(deferred.calls.verify, 0);
-  console.log('Pipeline passed: full-text context, bounded rewrite+verify, independent acceptance/rejection, usage ledger and budget deferral.');
+
+  // Retirement + reprocessing: a stale wrong cached headline must never be served, and
+  // the same article must be reprocessed under the active policy within the same daily
+  // budget. The original is restored first, then a fresh, correct rewrite replaces it.
+  const staleWrong = 'כותרת שגויה: הניסוי במל״ט נכשל';
+  const staleSeed = {
+    articles: [{ id: 'https://ynet.co.il/news/article/1', url: 'https://www.ynet.co.il/news/article/1',
+      sourceId: 'ynet', sourceName: 'ynet', originalHeadline: 'לפי המועצה: 3 תוכניות אושרו',
+      headline: staleWrong, rewriteStatus: 'rewritten', rewriteFingerprint: 'old-policy',
+      categories: ['בארץ'], description: 'תיאור', publishedAt: publishedAt.toISOString() }],
+    updatedAt: null, lastAttemptAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+    policyFingerprint: 'old-policy', rewriteStatus: 'ok', sources: [] };
+  const reprocessed = await (await store.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: staleSeed,
+    env: { REWRITE_MODEL: '@cf/meta/llama-3.1-8b-instruct-fp8-fast', VALIDATOR_MODEL: '@cf/cloudflare/clef-flash',
+      DAILY_NEURON_BUDGET: '6000', CONTEXT_CHARS: '6000', MAX_CONTEXT_FETCHES: '4' } }) })).json();
+  assert.equal(reprocessed.result.state, 'complete');
+  assert.ok(reprocessed.calls.rewrite > 0); // the retired article was reprocessed, not skipped
+  const served = await (await mf.dispatchFetch('https://fixture.local/api/news')).json();
+  assert.ok(!served.articles.some((article) => article.headline === staleWrong));
+  const fixed = served.articles.find((article) => article.id === 'https://ynet.co.il/news/article/1');
+  assert.ok(fixed, 'reprocessed article missing');
+  assert.equal(fixed.rewriteStatus, 'rewritten');
+  assert.equal(fixed.headline, 'לפי המועצה אושרו 3 תוכניות');
+  console.log('Pipeline passed: full-text context, bounded rewrite+verify, independent acceptance/rejection, usage ledger, budget deferral, and stale-rewrite retirement with reprocessing.');
 } finally { await mf.dispose().catch(() => {}); await rm(directory, { recursive: true, force: true }).catch(() => {}); }

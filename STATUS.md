@@ -7,6 +7,24 @@
 - Sessions/control are on `shurik-control/main`; iterations continue immediately
   (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
+## Verified (2026-10-13, iteration 2-6)
+
+11. **Runtime checks now exercise current source.** `test:worker`, `test:browser` and
+    `test:interaction` rebuild the bundle first, and new `scripts/bundle-guard.js`
+    refuses a missing or stale `dist/worker.js` (compared by mtime against `src/`,
+    `websites.json`, `package.json`). A passing runtime check can no longer validate an
+    old build, and a direct `node scripts/smoke.js` exits with a clear message instead
+    of an ENOENT stack. The esbuild-based checks already read `src/` directly.
+12. **Retire→reprocess regression.** `npm run test:pipeline` now seeds a stale wrong
+    cached headline for a fixture article, runs the real refresh with the mock model,
+    and asserts the wrong headline is never served while the article is reprocessed
+    under the active policy and replaced by the verified rewrite (same daily budget).
+13. **Deploy-migration regression made faithful.** `npm run test:retirement` now seeds
+    the actual pre-correction bootstrap state — `rewriteFingerprint`
+    `<model>:editorial-v2` and a snapshot with no `policyFingerprint` — and still
+    proves the reported success→failure headline is retired to its original on first
+    serve, with no inference available.
+
 ## Verified (2026-10-13, iteration 2-5)
 
 8. **Interactive/keyboard QA.** New `scripts/interaction-check.js`
@@ -99,11 +117,13 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Latest full validation (iteration 2-5): `npm run check`, **46 unit tests**,
+Latest full validation (iteration 2-6): `npm run check`, **46 unit tests**,
 `npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
-`npm run test:pipeline` (mock model end-to-end), `npm run test:batch` (validator-window
-splitting), `npm run test:browser` and `npm run test:interaction` all pass
-(two consecutive full runs).
+`npm run test:pipeline` (mock model end-to-end + retire/reprocess), `npm run test:batch`
+(validator-window splitting), `npm run test:browser` and `npm run test:interaction` all
+pass. The bundle-freshness guard was exercised: a direct `node scripts/smoke.js` after
+touching `src/worker.js` exited 2 with the stale-bundle message, then passed after a
+rebuild. (Iteration 2-5 ran the full battery twice.)
 
 ## Blocked / needs input
 
@@ -119,6 +139,13 @@ splitting), `npm run test:browser` and `npm run test:interaction` all pass
    Real-article extraction itself has now been exercised against live pages (see
    iteration 2-5); mako/N12 serve a bot challenge to the project User-Agent, so those
    articles preserve originals rather than bypassing the challenge.
+   Evidence for the Qwen3 switch (iteration 2-6, docs/schema check): Cloudflare's
+   Qwen3 page documents `response_format` and exposes `choices.message.reasoning_content`,
+   and workerd's bundled AI types declare `chat_template_kwargs` for gpt-oss but not for
+   Qwen3, so thinking-off currently relies on the Qwen `/no_think` soft switch plus a
+   best-effort `chat_template_kwargs`. A live call must confirm which option the account
+   honors before the default is switched; both parser paths (chat `choices` and text
+   `response`) are already covered.
 3. **Interactive QA.** Keyboard traversal, filter/order/pagination interaction and
    the rendered error/retry state are now covered by `npm run test:interaction`
    (see iteration 2-5). Render checks at 390×844 and 1440×1000 passed previously.

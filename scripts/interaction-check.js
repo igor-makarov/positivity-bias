@@ -5,16 +5,17 @@
 // No external traffic; fixtures exist only inside Miniflare.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import net from 'node:net';
 import { Miniflare, convertV4MiniflareOptions, Log, LogLevel } from 'miniflare';
+import { requireFreshBundle } from './bundle-guard.js';
 
 const browser = ['chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable']
   .find((name) => spawnSync('which', [name]).status === 0);
 if (!browser) { console.error('No Chromium/Chrome binary found on PATH; interaction check skipped. Install one to run this check.'); process.exit(2); }
-if (!existsSync('dist/worker.js')) { console.error('dist/worker.js is missing; run `npm run build` before `npm run test:interaction`.'); process.exit(2); }
+requireFreshBundle('npm run test:interaction');
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const freePort = () => new Promise((resolve) => {
