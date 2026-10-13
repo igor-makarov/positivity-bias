@@ -1,11 +1,6 @@
 {
-  "checkpoint": {
-    "nonce": "1791912301199",
-    "id": "main:2-12",
-    "minEntryId": 3614,
-    "maxEntryId": 3614,
-    "at": "2026-10-13T17:25:01.211Z",
-    "phase": "started"
-  },
-  "log": ""
+  "outcome": "yielded",
+  "code": 0,
+  "log": "",
+  "checkpointAt": "2026-10-13T17:25:01.211Z"
 }
