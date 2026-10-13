@@ -88,16 +88,18 @@ call, reconciles it with provider-reported usage, and defers work instead of
 overspending. No billing upgrade, retries or automatic budget increase.
 
 Accepted rewrites are cached with a policy fingerprint covering the model, the
-full-context extraction policy, the editorial prompt and the validator version. At
-read/serve time, and through a persisted idempotent migration, any rewrite whose
-fingerprint does not match the active policy is retired: the generated headline is
-cleared, the original returns to display, and the article is reprocessed
-progressively under the same daily budget. Full article text is inference context
-only — it is never shown in the UI, returned by the public API, or written to Git.
-The original remains visible, and rejected numbers/uncertainty changes, newly added
-sensational framing, rhetorical questions, outcome reversals and insufficient
-context all fall back to an explicitly labeled original title. Automated guards
-cannot fully prove factual fidelity; editorial review is still useful.
+full-context extraction policy, the editorial prompt and the validator version, and
+source-grounded rejections are cached by the same fingerprint plus a source-content
+fingerprint. At read/serve time, and through a persisted idempotent migration, any
+decision whose fingerprint does not match the active policy (or whose source content
+changed) is retired: the generated headline is cleared, the original returns to
+display, and the article is reprocessed progressively under the same daily budget.
+Full article text is inference context only — it is never shown in the UI, returned
+by the public API, or written to Git. The original remains visible, and rejected
+numbers/uncertainty changes, newly added sensational framing, rhetorical questions,
+outcome reversals and insufficient context all fall back to an explicitly labeled
+original title. Automated guards cannot fully prove factual fidelity; editorial
+review is still useful.
 
 **No model classification is currently needed.** If a concrete classification
 need arises, use `@cf/cloudflare/clef-flash` as requested. Categories come from RSS category fields,

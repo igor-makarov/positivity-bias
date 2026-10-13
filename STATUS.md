@@ -32,12 +32,15 @@
    `scripts/retirement-check.js` seeds a stale wrong headline and confirms it is not
    served even with no inference available. `scripts/pipeline-check.js` runs the real
    refresh/rewrite/verify/budget flow against a deterministic mock model, proving
-   independent acceptance/rejection, the usage ledger and budget deferral.
+   independent acceptance/rejection, cached decisions (no re-inference on a second
+   refresh), the usage ledger and budget deferral.
 4. **Adaptive daily budget.** `src/budget.js` replaces the 8/hour and 1024-token
    caps with token-budgeted batches sized from full-text input, model context and a
    persisted reservation against `DAILY_NEURON_BUDGET` (default 6000 of the shared
    10,000/day), reconciled with provider usage and deferred instead of overspending.
-   `MAX_CONTEXT_FETCHES` (20) keeps page fetches inside subrequest limits.
+   `MAX_CONTEXT_FETCHES` (20) keeps page fetches inside subrequest limits. Accepted
+   rewrites and source-grounded rejections are cached by policy+source fingerprint,
+   so neither inference is repeated for unchanged articles.
 5. **Regressions.** Exact reported success→failure reversal (heuristic + Clef
    rejection), the Karmiel/Dimona material-context case (omitted speakers fail;
    faithful rewrite accepted), cross-article independence, and stale-cache
