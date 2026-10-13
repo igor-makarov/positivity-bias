@@ -82,6 +82,26 @@ remaining budget/context is insufficient; preserve originals on quota failure.
 No billing upgrade, paid-only models, expensive fallback, unbounded reasoning,
 unbounded retries, automatic increase of the DAILY neuron budget or new features.
 
+Existing rewrites must be reset as part of this correction. The current code
+queues outdated fingerprints for reprocessing but can continue displaying the old
+generated headline until a replacement succeeds; a fingerprint bump alone is not
+enough. Retire ALL rewrites generated before the full-text factual-validation
+pipeline, including previously accepted ones. Preserve each article, its original
+headline, source URL, publisher categories and publication time; clear only the
+generated headline/acceptance and stale verification metadata, restoring the
+original for display while the article is queued for fresh processing.
+
+Enforce this policy at read/serve time as well as through a persisted idempotent
+migration: missing/outdated model-policy-source fingerprints must never expose an
+untrusted cached rewrite, even before the next refresh or during cooldown/quota
+failure. Include full-context extraction policy and factual-validator version in
+the fingerprint. The reported success-to-failure headline must immediately fall
+back to its preserved original when this correction deploys. Reprocess the retained
+articles progressively under the SAME daily free-tier budget; do not reset usage
+reservations, cooldowns or create a burst of inference. Add a regression that seeds
+an old wrong cached headline and verifies that it is no longer served when the
+new pipeline version is active, even if inference is unavailable.
+
 Official references:
 - https://developers.cloudflare.com/workers-ai/models/qwen3-30b-a3b-fp8/
 - https://developers.cloudflare.com/workers-ai/models/clef-flash/
