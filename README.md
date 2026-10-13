@@ -35,7 +35,8 @@ headlines are never replaced with sample articles. The first request starts a
 bounded background refresh; reload after it finishes. Wrangler local development
 needs outbound access to the publisher hosts for live aggregation. Additional
 workerd checks: `npm run test:worker` (fixtures), `npm run test:extract`
-(full-text extraction) and `npm run test:retirement` (stale-cache retirement).
+(full-text extraction), `npm run test:retirement` (stale-cache retirement) and
+`npm run test:pipeline` (mock-model end-to-end).
 
 ## Cloudflare deployment
 

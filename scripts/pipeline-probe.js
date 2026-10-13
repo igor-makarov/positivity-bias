@@ -1,7 +1,7 @@
 // Probe worker used only by scripts/pipeline-check.js. It injects a deterministic
 // mock model into a real NewsStore so the refresh/rewrite/verify/budget orchestration
 // runs under workerd without any external inference.
-import { NewsStore } from '../src/worker.js';
+import worker, { NewsStore } from '../src/worker.js';
 
 const validatorDefault = '@cf/cloudflare/clef-flash';
 
@@ -36,4 +36,4 @@ export class PipelineStore extends NewsStore {
   }
 }
 
-export default { fetch: () => new Response('pipeline probe') };
+export default worker;

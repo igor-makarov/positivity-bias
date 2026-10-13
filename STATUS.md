@@ -30,7 +30,9 @@
    retired at read/serve time and by a persisted idempotent migration: the generated
    headline is cleared, the original returns, article identity/source facts stay.
    `scripts/retirement-check.js` seeds a stale wrong headline and confirms it is not
-   served even with no inference available.
+   served even with no inference available. `scripts/pipeline-check.js` runs the real
+   refresh/rewrite/verify/budget flow against a deterministic mock model, proving
+   independent acceptance/rejection, the usage ledger and budget deferral.
 4. **Adaptive daily budget.** `src/budget.js` replaces the 8/hour and 1024-token
    caps with token-budgeted batches sized from full-text input, model context and a
    persisted reservation against `DAILY_NEURON_BUDGET` (default 6000 of the shared
@@ -42,7 +44,8 @@
    retirement are all covered.
 
 Validation this iteration: `npm run check`, **38 unit tests**, `npm run build`,
-`npm run test:worker`, `npm run test:extract`, `npm run test:retirement` all pass.
+`npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
+`npm run test:pipeline` (mock model end-to-end) and `npm run test:browser` all pass.
 
 ## Blocked / needs input
 
