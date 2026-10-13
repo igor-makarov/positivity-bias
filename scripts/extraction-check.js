@@ -9,7 +9,7 @@ import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 // The bundle must live under the working directory so workerd resolves it.
 const directory = await mkdtemp(join(process.cwd(), '.probe-'));
 const outfile = join(directory, 'probe.js');
-await build({ entryPoints: ['scripts/extract-probe.js'], bundle: true, format: 'esm', platform: 'neutral', target: 'es2022', outfile });
+await build({ entryPoints: ['scripts/extract-probe.js'], bundle: true, format: 'esm', platform: 'browser', target: 'es2022', outfile });
 
 const mf = new Miniflare(convertV4MiniflareOptions({
   cf: false, name: 'extract-probe', scriptPath: outfile, modules: true, compatibilityDate: '2026-10-13'

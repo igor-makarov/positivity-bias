@@ -3,14 +3,13 @@
 // seeded directly into the Durable Object, then read back through the real API.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 
 const directory = await mkdtemp(join(process.cwd(), '.probe-'));
 const outfile = join(directory, 'probe.js');
-await build({ entryPoints: ['scripts/retirement-probe.js'], bundle: true, format: 'esm', platform: 'neutral', target: 'es2022', outfile,
-  alias: { 'fast-xml-parser': resolve('scripts/stub-fast-xml-parser.js') } });
+await build({ entryPoints: ['scripts/retirement-probe.js'], bundle: true, format: 'esm', platform: 'browser', target: 'es2022', outfile });
 
 const mf = new Miniflare(convertV4MiniflareOptions({
   cf: false, name: 'positivity-bias', scriptPath: outfile, modules: true, compatibilityDate: '2026-10-13',
