@@ -7,7 +7,23 @@
 - Sessions/control are on `shurik-control/main`; iterations continue immediately
   (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
-## Verified this iteration (2026-10-13, iteration 2-3)
+## Verified this iteration (2026-10-13, iteration 2-4)
+
+6. **Shared batch sizing fix.** `planBatches` previously sized requests by the
+   rewrite model's context window only, so the same full article contexts were then
+   sent to `clef-flash` (32,768 tokens) in an oversized verification request — e.g.
+   20 articles (~82k tokens) or 9 articles (~37k tokens) in one request. Requests are
+   now sized for the **smaller** of the rewrite and validator windows
+   (`requestContextTokens`), output space is reserved per article, and the runtime
+   plans from the **actual** extracted text length. `scripts/batch-check.js` seeds
+   nine full-text articles and proves they split into multiple requests with every
+   verification inside the validator window; `npm run test:batch` passes.
+7. **Interactive-QA API coverage.** `scripts/smoke.js` now also checks category
+   filtering, `order=latest` chronology, offset pagination (non-overlapping pages)
+   and the summary-only `/api/status` shape, alongside the existing source/search
+   filters and error codes.
+
+## Verified (2026-10-13, iteration 2-3)
 
 0. **Branding correction.** Removed the `POSITIVITY BIAS` span from
    `public/index.html` and the now-unused `.brand-caption` rules and reserved
@@ -46,9 +62,10 @@
    faithful rewrite accepted), cross-article independence, and stale-cache
    retirement are all covered.
 
-Validation this iteration: `npm run check`, **38 unit tests**, `npm run build`,
+Validation this iteration: `npm run check`, **43 unit tests**, `npm run build`,
 `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
-`npm run test:pipeline` (mock model end-to-end) and `npm run test:browser` all pass.
+`npm run test:pipeline` (mock model end-to-end), `npm run test:batch` (validator-window
+splitting) and `npm run test:browser` all pass.
 
 ## Blocked / needs input
 
@@ -61,8 +78,10 @@ Validation this iteration: `npm run check`, **38 unit tests**, `npm run build`,
    Clef Flash behaviour and real neuron use remain unmeasured. Mocks/fixtures prove
    wiring and fallbacks only. Switch the default to Qwen3 only after measured live
    checks. Do not interpret a passing fixture as successful production inference.
-3. **Interactive QA pending** (keyboard traversal, filters, order, pagination,
-   error states). Render checks at 390×844 and 1440×1000 passed previously.
+3. **Interactive QA pending** (keyboard traversal and rendered error states). The
+   API contracts behind the filters, order and pagination are now covered by
+   `npm run test:worker`; keyboard traversal still needs a scripted browser pass.
+   Render checks at 390×844 and 1440×1000 passed previously.
 4. Kan JSON-LD has no `articleSection`, so Kan categories remain missing by policy.
 
 Steering goes through `PROMPT.md`; further implementation belongs to Shurik.

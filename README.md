@@ -32,8 +32,9 @@ headlines are never replaced with sample articles. The first request starts a
 bounded background refresh; reload after it finishes. Wrangler local development
 needs outbound access to the publisher hosts for live aggregation. Additional
 workerd checks: `npm run test:worker` (fixtures), `npm run test:extract`
-(full-text extraction), `npm run test:retirement` (stale-cache retirement) and
-`npm run test:pipeline` (mock-model end-to-end).
+(full-text extraction), `npm run test:retirement` (stale-cache retirement),
+`npm run test:pipeline` (mock-model end-to-end) and `npm run test:batch`
+(validator-window batch splitting).
 
 ## Cloudflare deployment
 
@@ -80,8 +81,11 @@ and material context preserved without misleading omission, broadening, narrowin
 changed emphasis? A candidate is accepted only when both are true; anything
 unsupported, incomplete or uncertain falls back to the preserved original.
 
-Requests are sized adaptively from the full-text input, the model context window,
-reserved output space and the remaining daily budget. The project reserves a
+Requests are sized adaptively from the actual full-text input, the context window,
+reserved output space and the remaining daily budget. The same context goes to both
+the rewrite model and the validator, so each request is limited to the **smaller** of
+their context windows (`clef-flash` is 32,768 tokens) and output space is reserved per
+article. The project reserves a
 conservative slice of the shared **10,000-neuron/day** free allocation
 (`DAILY_NEURON_BUDGET`, default 6000), persists the reservation before any model
 call, reconciles it with provider-reported usage, and defers work instead of
