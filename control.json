@@ -5,7 +5,7 @@
   "branch": "main",
   "defaultBranch": "main",
   "supervisor": "a637cd4b71137ca58960dda0bbb0dd487064810d",
-  "status": "running",
+  "status": "stopped",
   "generation": 2,
   "next": 17,
   "engine": {
@@ -34,7 +34,7 @@
   "source": "9376c22f0d7d956b36eb4f617db8dcd259ad703f",
   "sourceRef": null,
   "createdAt": "2026-10-13T13:13:19.552Z",
-  "lastDispatchAt": "2026-10-13T18:41:29.206Z",
+  "lastDispatchAt": null,
   "checkpoint": {
     "workCommit": "d077b006d6e6f526d46b7829ab3ea34706d437b7",
     "generation": 2,
@@ -138,5 +138,6 @@
     "runId": "38419826476",
     "conclusion": "failure",
     "at": "2026-10-13T15:14:29.185Z"
-  }
+  },
+  "stoppedAt": "2026-10-13T18:58:40Z"
 }
