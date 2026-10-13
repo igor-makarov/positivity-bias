@@ -84,6 +84,7 @@ export function articleMetadata(jsonTexts, meta = {}) {
   const article = nodes.find((node) => array(node['@type']).some((type) => ['NewsArticle', 'Article', 'ReportageNewsArticle'].includes(type))) || {};
   return { headline: plainText(article.headline || meta['og:title'], 300),
     description: plainText(article.description || meta['og:description'] || meta.description, 400),
+    body: plainText(article.articleBody, 200_000),
     categories: array(article.articleSection || meta['article:section']).map((cat) => plainText(cat, 80)).filter(Boolean),
     publishedAt: article.datePublished || meta['article:published_time'] };
 }
