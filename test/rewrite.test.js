@@ -227,6 +227,14 @@ test('A model omission is not a decision: only answered articles are evaluated',
   assert.deepEqual(candidates.map((candidate) => candidate.id), ['story-1']);
 });
 
+test('A parseable response that answers no requested article is reported as empty', async () => {
+  const items = [base, { ...base, id: 'story-2' }];
+  const { candidates, evaluated, status } = await rewriteBatch(items, { AI: { run: async () => ({ response: JSON.stringify({ items: [] }) }) } });
+  assert.equal(status, 'rejected');
+  assert.equal(candidates.length, 0);
+  assert.equal(evaluated.size, 0); // nothing was answered, so the caller can flag a failure
+});
+
 // A definitive clef no is a decision; a missing/ambiguous answer is not. Only the
 // former may be cached as a rejection.
 test('An ambiguous clef answer is distinguished from a definitive rejection', async () => {

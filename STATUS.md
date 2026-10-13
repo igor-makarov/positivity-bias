@@ -25,6 +25,17 @@
     and is rewritten on the next refresh. Both new assertions were shown to fail against the
     pre-fix loop (omitted article served as `rejected`, zero retry calls) and pass after it.
 
+27. **A parseable-but-empty model response was reported as a healthy `ok`.** The
+    unparseable-response fix (2-10) only caught invalid JSON; a response that parsed to
+    valid JSON with no usable items (the model answered none of the requested articles,
+    or answered with unmatched ids) still set the snapshot `rewriteStatus` to `ok` while
+    nothing was rewritten, hiding a silently failing pipeline. The run now also tracks
+    `invalid_response` when a `rejected` batch evaluated (answered) zero of its articles.
+    Unit regression covers the empty-items contract; `npm run test:pipeline` runs an
+    `empty` mock and asserts `invalid_response` with untouched originals and no cached
+    rejections. The integration assertion was shown to fail (`ok`) against the pre-fix
+    status logic and pass after the fix.
+
 ## Verified (2026-10-13, iteration 2-11)
 
 23. **Headline-less trusted rewrite could still be served.** `retireStaleRewrites`
@@ -275,7 +286,7 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Latest full validation (iteration 2-12): `npm run check`, **58 unit tests**,
+Latest full validation (iteration 2-12): `npm run check`, **59 unit tests**,
 `npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`
 (adds the current-fingerprint headless-rewrite serve-time regression),
 `npm run test:pipeline` (mock model end-to-end, retire/reprocess, honest

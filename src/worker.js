@@ -175,6 +175,9 @@ export class NewsStore {
         context, contextCompleteness: completeness }));
       const rewrite = await rewriteBatch(items, this.env, { model });
       if (rewrite.status === 'invalid_response') invalidResponse = true;
+      // A parseable response that answered none of the requested articles is a failed
+      // rewrite, not a healthy one: surface it instead of reporting `ok`.
+      if (rewrite.status === 'rejected' && (rewrite.evaluated?.size ?? 0) === 0) invalidResponse = true;
       if (rewrite.status === 'provider_unavailable' || rewrite.status === 'budget_guard') {
         this.reconcileUsage(day, estimate, rewrite.usage ?? 0);
         snapshot.rewriteStatus = rewrite.status;

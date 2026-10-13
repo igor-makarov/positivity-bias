@@ -140,5 +140,19 @@ try {
   const retriedSeed = { ...afterPartial, lastAttemptAt: new Date(Date.now() - 2 * 3_600_000).toISOString() };
   const retried = await (await partialStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: retriedSeed, env: partialEnv }) })).json();
   assert.ok(retried.calls.rewrite > 0, 'an omitted article must be retried, not cached as rejected');
-  console.log('Pipeline passed: full-text context, bounded rewrite+verify, independent acceptance/rejection, usage ledger, budget deferral, model-omission retry, and stale-rewrite retirement with reprocessing.');
+
+  // A parseable response that answers none of the requested articles is a failed
+  // rewrite, not a healthy `ok`: it must be reported honestly and keep (and retry)
+  // the preserved originals rather than caching them as rejections.
+  const emptyStore = namespace.get(namespace.idFromName('empty'));
+  const emptyEnv = { ...partialEnv, MOCK_REWRITE: 'empty' };
+  const emptySeed = { articles: [], updatedAt: null, lastAttemptAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+    policyFingerprint: null, rewriteStatus: 'not_configured', sources: [] };
+  const empty = await (await emptyStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: emptySeed, env: emptyEnv }) })).json();
+  assert.equal(empty.result.state, 'complete');
+  assert.equal(empty.result.rewriteStatus, 'invalid_response');
+  const emptyServed = await (await emptyStore.fetch('https://news.internal/snapshot')).json();
+  assert.ok(emptyServed.articles.length > 0);
+  assert.ok(emptyServed.articles.every((article) => article.headline === article.originalHeadline && article.rewriteStatus === 'original'));
+  console.log('Pipeline passed: full-text context, bounded rewrite+verify, independent acceptance/rejection, usage ledger, budget deferral, model-omission retry, honest empty-response status, and stale-rewrite retirement with reprocessing.');
 } finally { await mf.dispose().catch(() => {}); await rm(directory, { recursive: true, force: true }).catch(() => {}); }

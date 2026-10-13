@@ -21,6 +21,8 @@ function createMockAI(validatorModel, rewriteMode) {
     calls.rewrite++;
     // A model that returns unparseable output must be surfaced, not reported as ok.
     if (rewriteMode === 'invalid') return { response: 'not json' };
+    // Parseable JSON that answers none of the requested articles is also a failure.
+    if (rewriteMode === 'empty') return { response: JSON.stringify({ items: [] }) };
     const items = JSON.parse(input.messages[1].content);
     // Simulate a model that silently drops an article: only the `/1` article is ever
     // answered, so `/2` is a model omission, not a rejection decision.
