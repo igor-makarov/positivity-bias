@@ -76,8 +76,8 @@ jobs:
           checkpoint-seconds: 60
           provider: ${{ inputs.provider }}
           model: ${{ inputs.model || (inputs.command == 'start' && (!inputs.provider || inputs.provider == 'opencode-go') && 'deepseek-v4.1-flash' || '') }}
-          work-seconds: ${{ inputs['work-seconds'] || (inputs.command == 'start' && '600' || '') }}
-          wait-seconds: ${{ inputs['wait-seconds'] || (inputs.command == 'start' && '3600' || '') }}
+          work-seconds: ${{ inputs['work-seconds'] || (inputs.command == 'start' && '1800' || '') }}
+          wait-seconds: ${{ inputs['wait-seconds'] || (inputs.command == 'start' && '0' || '') }}
           prompt: PROMPT.md
           checkpoint-paths: '[]'
       - name: Preserve emergency snapshot after publication failure

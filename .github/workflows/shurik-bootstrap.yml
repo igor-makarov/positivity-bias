@@ -1,4 +1,4 @@
-name: Start main loop
+name: Configure main loop
 on:
   push:
     branches: [main]
@@ -12,7 +12,7 @@ concurrency:
   group: shurik-control-main
   cancel-in-progress: false
 jobs:
-  start:
+  configure:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -20,12 +20,21 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Check whether main already has a loop
+      - name: Check existing loop before configuring zero wait
         id: existing
         shell: bash
         run: |
           if git ls-remote --exit-code origin refs/heads/shurik-control/main > /dev/null; then
             echo 'exists=true' >> "$GITHUB_OUTPUT"
+            git fetch origin refs/heads/shurik-control/main
+            git show FETCH_HEAD:control.json > "$RUNNER_TEMP/shurik-main-control.json"
+            node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const c = JSON.parse(readFileSync(process.env.RUNNER_TEMP + '/shurik-main-control.json', 'utf8'));
+          if (c.status !== 'running') throw new Error('Existing loop is stopped; leaving it stopped.');
+          if (c.owner) throw new Error('Existing iteration is active; configure only at an idle boundary.');
+          appendFileSync(process.env.GITHUB_OUTPUT, 'resume=true\n');
+          NODE
           else
             status=$?
             if [ "$status" -ne 2 ]; then exit "$status"; fi
@@ -42,6 +51,16 @@ jobs:
           reasoning: high
           create-pr: 'false'
           prompt: PROMPT.md
-          work-seconds: 600
-          wait-seconds: 3600
+          work-seconds: 1800
+          wait-seconds: 0
           checkpoint-seconds: 60
+      - if: steps.existing.outputs.resume == 'true'
+        uses: igor-makarov/shurik@v1
+        with:
+          command: resume
+          loop-id: main
+          workflow: shurik.yml
+          reasoning: high
+          create-pr: 'false'
+          work-seconds: 1800
+          wait-seconds: 0

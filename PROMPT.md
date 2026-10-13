@@ -273,10 +273,12 @@ Keep changes reviewable and leave main working. Update `STATUS.md` only for actu
 changes, new verification evidence, or changed blockers. Keep it short. Summarize
 what was verified and what still needs user input, without exposing credentials.
 
-The loop waits at least 3600 seconds after each iteration; Shurik recovery checks
-every 15 minutes and resumes when due (GitHub scheduling may delay it). An hourly
-Codex checkup reads this file and can steer priorities. Do not sleep inside an
-iteration or create additional loops, workflows, schedules, or recurring tasks.
+The user requires ZERO idle wait between Shurik iterations (`wait-seconds: 0`).
+Iterations should continue immediately. Hourly Codex checkups are separate from
+Shurik's coding cadence; never turn them into a one-hour loop delay. Do not sleep
+inside iterations or create duplicate loops, workflows, schedules or recurring tasks.
+The supervisor temporarily paused the existing hourly checkup while verifying a
+completed zero-wait iteration. It may resume that same checkup after verification.
 
 Operational evidence (2026-10-13): iteration 1 completed, but its saved due time
 passed without any GitHub scheduled recovery run. The supervisor reran that run's
@@ -286,3 +288,10 @@ continuations and can rerun canonical recovery once only while the loop is enabl
 ownerless and has no queued/active iteration or recovery. It respects user stops.
 Investigate the missing scheduled recovery when authorized GitHub workflow access
 is available; preserve the existing loop and do not create duplicate schedules.
+
+Checkpoint coordination: iteration 2 failed with a non-fast-forward atomic push
+because the supervisor committed PROMPT.md during an owned iteration. The supervisor
+will complete steering/configuration edits before canonical resume and avoid writes
+while a worker or continuation is active. Preserve current remote main commits and
+Shurik's saved/emergency work; never force-push over steering changes. Treat current
+PROMPT.md as authoritative on the resumed iteration, rather than a restored old copy.
