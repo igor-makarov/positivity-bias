@@ -3,6 +3,7 @@
 // pipeline (or an older grounding/verification policy) can never be displayed.
 
 export const EDITORIAL_VERSION = 'editorial-v3';
+export const REWRITE_CONTRACT_VERSION = 'structured-ids-v1';
 // v2: bounded HTMLRewriter body extraction with navigation/advertising/related removed.
 // v3: a noise-named layout wrapper (e.g. Bootstrap's "row navigation") wrapping the
 // whole page no longer suppresses <main>; live Kan article pages now yield a complete
@@ -78,9 +79,9 @@ export function modelNeuronRate(model) {
   return MODEL_NEURON_RATES[model] || { in: 0.005, out: 0.035 };
 }
 
-// The factual-consistency decision may only be delegated to a documented clef
-// decision model; other models do not accept the state/questions schema below.
-export const CLEF_MODELS = new Set([DEFAULT_VALIDATOR_MODEL, '@cf/cloudflare/clef']);
+// Validation is restricted to the inexpensive Flash model. The pricing table for
+// non-Flash Clef is comparison data, not permission to execute an expensive fallback.
+export const CLEF_MODELS = new Set([DEFAULT_VALIDATOR_MODEL]);
 
 export function isClefModel(model) {
   return CLEF_MODELS.has(model);
@@ -89,7 +90,7 @@ export function isClefModel(model) {
 export function policyFingerprint(env = {}) {
   const model = env.REWRITE_MODEL || DEFAULT_REWRITE_MODEL;
   const validator = env.VALIDATOR_MODEL || DEFAULT_VALIDATOR_MODEL;
-  return `${model}|${validator}|${EDITORIAL_VERSION}|${CONTEXT_POLICY}|${VALIDATOR_VERSION}`;
+  return `${model}|${validator}|${EDITORIAL_VERSION}|${CONTEXT_POLICY}|${VALIDATOR_VERSION}|${REWRITE_CONTRACT_VERSION}`;
 }
 
 // Stable, non-reversible fingerprint of the source facts a decision was made from.

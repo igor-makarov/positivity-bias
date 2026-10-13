@@ -94,6 +94,12 @@ weakly-positive or uncertain verdict, like any unsupported or incomplete candida
 falls back to the preserved original. Calls are chunked to the documented 64-question
 and 24,576-token limits. Clef is charged for input tokens only.
 
+Rewrite requests use a JSON schema with short, request-local article IDs; those IDs
+are restored to the original article identity before factual verification or storage.
+The native binding's already-parsed JSON output is supported. Validation permits
+only Clef Flash. A changed policy can recover a failed pipeline once within the
+current refresh window, with its attempt and neuron reservation persisted before work.
+
 Requests are sized adaptively from the actual full-text input, the context window,
 reserved output space and the remaining daily budget. The same context goes to both
 the rewrite model and the validator, so each request is limited to the **smaller** of

@@ -8,6 +8,10 @@ import { budgetDecision, dailyNeuronBudget, estimateBatchNeurons, fitBatchToBudg
 import { HOUR, refreshDue } from './refresh.js';
 
 const sources = validateWebsites(configuration);
+// A repaired policy may recover one failed rewrite attempt immediately. Persist
+// the policy before work, so repeated readers cannot bypass the hourly guard.
+const policyRecoveryDue = (snapshot, env) => ['invalid_response', 'provider_unavailable', 'validator_misconfigured'].includes(snapshot.rewriteStatus)
+  && snapshot.lastRefreshPolicy !== policyFingerprint(env);
 
 const json = (body, status = 200) => Response.json(body, { status, headers: {
   'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
@@ -85,7 +89,7 @@ export class NewsStore {
     if (path === '/refresh' && request.method === 'POST') return json(await this.refresh());
     if (request.method !== 'GET' || path !== '/snapshot') return json({ error: 'not_found' }, 404);
     const snapshot = this.readSnapshot();
-    if (refreshDue(snapshot.lastAttemptAt)) {
+    if (refreshDue(snapshot.lastAttemptAt) || policyRecoveryDue(snapshot, this.env)) {
       this.state.waitUntil(this.refresh());
     }
     return json(snapshot);
@@ -105,9 +109,9 @@ export class NewsStore {
   async performRefresh() {
     const previous = this.readSnapshot();
     const now = Date.now();
-    if (!refreshDue(previous.lastAttemptAt, now)) return { state: 'cooldown' };
+    if (!refreshDue(previous.lastAttemptAt, now) && !policyRecoveryDue(previous, this.env)) return { state: 'cooldown' };
     // Persist the attempt before network work so failed refreshes cannot create request storms.
-    const snapshot = { ...previous, lastAttemptAt: new Date(now).toISOString() };
+    const snapshot = { ...previous, lastAttemptAt: new Date(now).toISOString(), lastRefreshPolicy: policyFingerprint(this.env) };
     this.writeSnapshot(snapshot);
     const incoming = [], statuses = [];
     for (const source of sources) {
@@ -132,7 +136,8 @@ export class NewsStore {
   async rewritePending(snapshot, now) {
     const diagnostics = snapshot.rewriteDiagnostics = {
       contextCandidates: 0, contextUsable: 0, rewriteCalls: 0, validatorBatches: 0,
-      answered: 0, proposed: 0, verified: 0, accepted: 0, failureStage: null, finishReason: null
+      answered: 0, proposed: 0, verified: 0, accepted: 0, failureStage: null, finishReason: null,
+      outputShape: null, returnedItems: 0
     };
     const fingerprint = policyFingerprint(this.env);
     const model = this.env.REWRITE_MODEL || DEFAULT_REWRITE_MODEL;
@@ -183,6 +188,8 @@ export class NewsStore {
       diagnostics.rewriteCalls++;
       diagnostics.answered += rewrite.evaluated?.size ?? 0;
       diagnostics.proposed += rewrite.candidates.length;
+      diagnostics.returnedItems += rewrite.returnedItems ?? 0;
+      if (rewrite.outputShape) diagnostics.outputShape = rewrite.outputShape;
       if (rewrite.finishReason) diagnostics.finishReason = rewrite.finishReason;
       if (rewrite.status === 'invalid_response' || (rewrite.evaluated?.size ?? 0) === 0) diagnostics.failureStage = 'rewrite';
       if (rewrite.status === 'invalid_response') invalidResponse = true;

@@ -29,6 +29,8 @@ If the body is missing or too thin for a faithful, complete headline, or the ori
 cannot be corrected without losing material context, set usable=false. Never guess.
 
 Return only JSON: {"items":[{"id":"...","headline":"...","usable":true}]}
+Return exactly one item for each supplied id. Copy its id unchanged; do not number,
+rename, merge or omit articles. Use usable=false when an article cannot be rewritten.
 Keep each headline under 180 characters, in Hebrew, with no markdown, emojis,
 exclamation marks or question marks.`;
 
@@ -194,6 +196,8 @@ function stripThinking(value) {
 }
 
 export function parseJsonObject(value) {
+  // JSON mode can return the parsed document directly through the native binding.
+  if (value && typeof value === 'object' && Array.isArray(value.items)) return value;
   const raw = stripThinking(typeof value === 'string' ? value : parseModelText(value));
   const trimmed = raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
   try { return JSON.parse(trimmed); } catch { /* fall through to brace extraction */ }
@@ -211,16 +215,16 @@ export function modelUsageNeurons(payload, model) {
   return estimateNeurons(model, input, output);
 }
 
-function buildInput(model, system, user, maxTokens) {
-  const input = { temperature: 0.1, max_tokens: maxTokens, response_format: { type: 'json_object' },
+function buildInput(model, system, user, maxTokens, schema) {
+  const input = { temperature: 0.1, max_tokens: maxTokens, response_format: { type: 'json_schema', json_schema: schema },
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }] };
   // Qwen3 supports disabling its thinking phase; harmless to the chat template if absent.
   if (/qwen3/i.test(model)) { input.chat_template_kwargs = { enable_thinking: false }; input.messages[0].content += '\n/no_think'; }
   return input;
 }
 
-async function runModel(env, model, system, user, maxTokens) {
-  const payload = await env.AI.run(model, buildInput(model, system, user, maxTokens));
+async function runModel(env, model, system, user, maxTokens, schema) {
+  const payload = await env.AI.run(model, buildInput(model, system, user, maxTokens, schema));
   return { payload, usage: modelUsageNeurons(payload, model) };
 }
 
@@ -229,33 +233,47 @@ async function runModel(env, model, system, user, maxTokens) {
 export async function rewriteBatch(items, env, { model = env.REWRITE_MODEL || DEFAULT_REWRITE_MODEL, maxTokens } = {}) {
   if (!env.AI || !items.length) return { candidates: [], evaluated: new Set(), status: 'not_configured', usage: null };
   if (!CHEAP_MODELS.has(model)) return { candidates: [], evaluated: new Set(), status: 'budget_guard', usage: null };
-  const requestItems = items.map((item) => ({
-    id: item.id, source: item.sourceName, publishedAt: item.publishedAt,
+  // Short request-local ids reduce output overhead and prevent the model from
+  // inventing/shortening long URL ids. They are mapped back before any decision.
+  const requestItems = items.map((item, index) => ({
+    id: index.toString(36), source: item.sourceName, publishedAt: item.publishedAt,
     originalHeadline: plainText(item.originalHeadline, 300),
     contextCompleteness: item.contextCompleteness,
     article: item.context
   }));
+  const schema = { type: 'object', additionalProperties: false, required: ['items'], properties: {
+    items: { type: 'array', minItems: items.length, maxItems: items.length, items: {
+      type: 'object', additionalProperties: false, required: ['id', 'headline', 'usable'], properties: {
+        id: { type: 'string', enum: requestItems.map((item) => item.id) },
+        headline: { type: 'string', maxLength: 180 }, usable: { type: 'boolean' }
+      }
+    } }
+  } };
   const user = JSON.stringify(requestItems);
   let payload, usage;
-  try { ({ payload, usage } = await runModel(env, model, EDITORIAL_PROMPT, user, maxTokens ?? OUTPUT_TOKENS_PER_ITEM * items.length + 32)); }
+  try { ({ payload, usage } = await runModel(env, model, EDITORIAL_PROMPT, user, maxTokens ?? OUTPUT_TOKENS_PER_ITEM * items.length + 32, schema)); }
   catch { return { candidates: [], evaluated: new Set(), status: 'provider_unavailable', usage: null }; }
   const document = parseJsonObject(payload);
   const choices = payload?.choices ?? payload?.result?.choices ?? payload?.response?.choices;
   const finishReason = ['stop', 'length', 'content_filter'].includes(choices?.[0]?.finish_reason) ? choices[0].finish_reason : null;
-  if (!Array.isArray(document?.items)) return { candidates: [], evaluated: new Set(), status: 'invalid_response', usage, finishReason };
+  const outputShape = Array.isArray(document) ? 'array' : document && typeof document === 'object' ? 'object' : 'unparseable';
+  const returnedItems = Array.isArray(document?.items) ? document.items.length : 0;
+  if (!Array.isArray(document?.items)) return { candidates: [], evaluated: new Set(), status: 'invalid_response', usage, finishReason, outputShape, returnedItems };
   const candidates = [];
   // `evaluated` tracks the articles the model actually answered for (exactly one item
   // per stable id). An id absent here is a model omission, not a rejection decision, so
   // the caller must not cache it as a source-grounded rejection.
   const evaluated = new Set();
-  for (const item of items) {
-    const matches = document.items.filter((candidate) => candidate.id === item.id);
+  const requestIds = new Set(requestItems.map((item) => item.id));
+  for (const [index, item] of items.entries()) {
+    const matches = document.items.filter((candidate) => candidate && (candidate.id === requestItems[index].id
+      || (!requestIds.has(candidate.id) && candidate.id === item.id)));
     if (matches.length !== 1) continue;
     evaluated.add(item.id);
     const headline = acceptRewrite(item, matches[0]);
     if (headline) candidates.push({ ...item, headline });
   }
-  return { candidates, evaluated, status: candidates.length === items.length ? 'ok' : candidates.length ? 'partial' : 'rejected', usage, finishReason };
+  return { candidates, evaluated, status: candidates.length === items.length ? 'ok' : candidates.length ? 'partial' : 'rejected', usage, finishReason, outputShape, returnedItems };
 }
 
 // Verifies candidates with the factual-consistency decision model. A candidate is

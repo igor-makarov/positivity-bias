@@ -116,6 +116,19 @@ try {
   assert.ok(invalidServed.articles.length > 0);
   assert.ok(invalidServed.articles.every((article) => article.headline === article.originalHeadline)); // originals preserved
   assert.ok(invalidServed.articles.every((article) => article.rewriteStatus !== 'rewritten')); // and not cached as trusted
+  // An explicit policy repair can recover a failed snapshot once within the hour.
+  // The attempt is persisted before model work; another read/refresh cannot retry it.
+  const repairedSeed = { ...invalidServed, lastRefreshPolicy: 'previous-contract' };
+  const repaired = await (await invalidStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({
+    snapshot: repairedSeed, env: { REWRITE_MODEL: '@cf/qwen/qwen3-30b-a3b-fp8', MOCK_REWRITE: 'invalid' }
+  }) })).json();
+  assert.equal(repaired.result.state, 'complete');
+  assert.ok(repaired.calls.rewrite > 0);
+  const guarded = await (await invalidStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({
+    env: { MOCK_REWRITE: 'invalid' }
+  }) })).json();
+  assert.equal(guarded.result.state, 'cooldown');
+  assert.equal(guarded.calls.rewrite, 0);
 
   // Retirement + reprocessing: a stale wrong cached headline must never be served, and
   // the same article must be reprocessed under the active policy within the same daily

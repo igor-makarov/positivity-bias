@@ -18,6 +18,20 @@
   and mocked end-to-end rewrite/verification/budget pipeline. Production verification
   follows deployment; this does not yet establish successful live inference.
 
+### Fresh production evidence and structured-output repair
+
+- The timing fix deployed in commit `7d45945307c9d15dcd08ab71aa03403224e25187`.
+  A direct live refresh at 19:10 UTC returned all four sources healthy: ynet 115,
+  Kan 8, N12 74 and mako 62; all feed errors cleared. Three native rewrite calls
+  finished normally but answered zero requested records, before any verification.
+- Rewrites now request an explicit JSON schema and short request-local IDs, support
+  directly parsed native JSON, and restore original IDs before validation/storage.
+  Clef Flash is the only executable validator. Policy repair permits one recovery
+  attempt inside the current window; repeated failed requests remain bounded.
+- Verified: 71 unit tests, build, Worker smoke, pipeline (including recovery fencing),
+  context/budget batch splitting and cached-rewrite retirement. Native inference
+  verification follows this deployment; mock success is not production evidence.
+
 ## Verified (2026-10-13, iteration 2-17)
 
 35. **A Qwen3 reasoning wrapper around the JSON answer was treated as unparseable.**

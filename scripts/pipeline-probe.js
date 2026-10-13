@@ -42,11 +42,11 @@ function createMockAI(validatorModel, rewriteMode, validatorMode) {
     // Simulate a model that silently drops an article: only the `/1` article is ever
     // answered, so `/2` is a model omission, not a rejection decision.
     if (rewriteMode === 'partial') {
-      const answered = items.filter((item) => /\/1$/.test(item.id));
+      const answered = items.filter((item) => item.originalHeadline === 'לפי המועצה: 3 תוכניות אושרו');
       return envelope(JSON.stringify({ items: answered.map((item) => ({ id: item.id, usable: true, headline: 'לפי המועצה אושרו 3 תוכניות' })) }));
     }
     return envelope(JSON.stringify({ items: items.map((item) => ({ id: item.id, usable: true,
-      headline: /\/2$/.test(item.id) ? 'ראשי ערים קראו לשינוי דמוגרפי בישראל' : 'לפי המועצה אושרו 3 תוכניות' })) }));
+      headline: item.originalHeadline.includes('האוכלוסייה') ? 'ראשי ערים קראו לשינוי דמוגרפי בישראל' : 'לפי המועצה אושרו 3 תוכניות' })) }));
   };
   return { calls, run };
 }

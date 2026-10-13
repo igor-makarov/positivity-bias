@@ -160,7 +160,7 @@ test('Cross-article fact mixing is rejected: a sibling headline cannot move to t
   const b = { id: 'mix-b', sourceName: 'mako', publishedAt: '2026-10-13T11:00:00Z',
     originalHeadline: 'המועצה אישרה 7 תוכניות חדשות', context: 'המועצה אישרה 7 תוכניות חדשות.', contextCompleteness: 'complete' };
   const env = { AI: { run: async (model, input) => {
-    assert.deepEqual(JSON.parse(input.messages[1].content).map((item) => item.id), ['mix-a', 'mix-b']); // stable boundaries
+    assert.deepEqual(JSON.parse(input.messages[1].content).map((item) => item.id), ['0', '1']); // stable request-local boundaries
     return { response: JSON.stringify({ items: [
       { id: 'mix-a', headline: 'המועצה אישרה 7 תוכניות חדשות', usable: true },
       { id: 'mix-b', headline: 'לפי המשטרה, 3 בני אדם נפצעו באירוע', usable: true }
@@ -183,13 +183,38 @@ test('A structured rewrite response accepts only requested, validated items and 
     assert.equal(model, DEFAULT_REWRITE_MODEL);
     assert.equal(input.temperature, 0.1);
     const sent = JSON.parse(input.messages[1].content)[0];
-    assert.equal(sent.id, 'story-1');
+    assert.equal(sent.id, '0');
     assert.match(sent.article, /הנסיבות נבדקות/); // full extracted body, not the 400-char excerpt
     assert.ok(input.messages[0].content.includes('material context'));
     return { response: JSON.stringify({ items: [result('לפי המשטרה, 3 בני אדם נפצעו באירוע'), { id: 'unrequested', headline: 'טקסט חיצוני', usable: true }] }) };
   } } });
   assert.equal(response.candidates.length, 1);
   assert.equal(response.candidates[0].headline, 'לפי המשטרה, 3 בני אדם נפצעו באירוע');
+});
+
+test('Native structured output uses short ids and restores original article identity', async () => {
+  const items = [base, { ...base, id: 'https://publisher.example/a-long-original-article-id' }];
+  const env = { AI: { run: async (model, input) => {
+    const sent = JSON.parse(input.messages[1].content);
+    assert.deepEqual(sent.map((item) => item.id), ['0', '1']);
+    assert.equal(input.response_format.type, 'json_schema');
+    const schema = input.response_format.json_schema;
+    assert.deepEqual(schema.required, ['items']);
+    assert.deepEqual(schema.properties.items.items.properties.id.enum, ['0', '1']);
+    assert.equal(schema.properties.items.minItems, 2);
+    return { items: sent.map((item) => ({ id: item.id, headline: 'לפי המשטרה, 3 בני אדם נפצעו באירוע', usable: true })) };
+  } } };
+  const response = await rewriteBatch(items, env);
+  assert.deepEqual(response.candidates.map((item) => item.id), items.map((item) => item.id));
+  assert.equal(response.evaluated.size, 2);
+  assert.equal(response.returnedItems, 2);
+});
+
+test('The expensive non-Flash validator cannot make a native call', async () => {
+  const env = { AI: { run: async () => { assert.fail('Non-Flash validation must not run'); } } };
+  const response = await verifyBatch([{ ...base, headline: base.originalHeadline }], env, { model: '@cf/cloudflare/clef' });
+  assert.equal(response.status, 'validator_misconfigured');
+  assert.equal(response.accepted.size, 0);
 });
 test('Rewrite reserves one complete short output per article; verification uses the clef schema', async () => {
   const items = [base, { ...base, id: 'story-2' }];
