@@ -1,0 +1,2 @@
+# Workers AI uses the AI binding in wrangler.jsonc; no inference API key is needed.
+# OPENCODE_API_KEY belongs only in GitHub Actions secrets for the Shurik loop.

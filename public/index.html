@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0070b4">
+  <meta name="description" content="במבט — חדשות ממקורות ישראליים, בכותרות ענייניות ובמבט רחב. לקרוא, להבין, ולהמשיך ביום.">
+  <title>במבט — חדשות בפרופורציה</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#news">מעבר לחדשות</a>
+  <header class="masthead wrap">
+    <a class="brand" href="/" aria-label="במבט — עמוד הבית"><span class="brand-mark" aria-hidden="true"></span>במבט<span class="brand-caption">POSITIVITY BIAS</span></a>
+    <div class="header-note">חדשות בפרופורציה.<br><span>כמה מקורות. פחות רעש.</span></div>
+    <a class="text-link about-link" href="#approach">איך אנחנו עורכים <span aria-hidden="true">↙</span></a>
+  </header>
+  <main>
+    <section class="intro wrap" aria-labelledby="intro-title">
+      <div class="eyebrow"><span class="small-square" aria-hidden="true"></span>מבט על מה שקורה <span id="edition-date" class="edition-date"></span></div>
+      <div class="intro-grid">
+        <h1 id="intro-title">לדעת מה קורה.<br><span>להישאר בפרופורציה.</span></h1>
+        <div class="intro-copy"><p>אותן עובדות, פחות דרמה.<br>חדשות ממקורות ישראליים, בכותרות ענייניות ובמבט רחב.</p><a class="text-link" href="#news">לקריאת העדכונים <span aria-hidden="true">↓</span></a></div>
+      </div>
+      <div class="edition-bar"><div><span class="small-square" aria-hidden="true"></span><span id="freshness">בודקים את העדכונים</span></div><div class="source-names"><span dir="ltr">ynet</span><span>כאן</span><span dir="ltr">N12</span><span dir="ltr">mako</span></div></div>
+    </section>
+    <section id="news" class="news-section wrap" aria-labelledby="news-title">
+      <div class="section-heading"><div><span class="section-number" aria-hidden="true">01</span><h2 id="news-title">העדכונים</h2></div><p id="result-count" aria-live="polite"></p></div>
+      <form id="filters" class="filters" role="search" aria-label="סינון חדשות">
+        <div class="search-field"><label for="search">חיפוש בחדשות</label><input id="search" name="q" type="search" placeholder="נושא, מקום או מילת מפתח" maxlength="120" autocomplete="off"><span aria-hidden="true">⌕</span></div>
+        <div><label for="source">מקור</label><select id="source" name="source"><option value="">כל המקורות</option><option value="ynet">ynet</option><option value="kan">כאן</option><option value="n12">N12</option><option value="mako">mako</option></select></div>
+        <div><label for="category">קטגוריה במקור</label><select id="category" name="category"><option value="">כל הקטגוריות</option></select></div>
+        <button type="submit" class="button filter-submit">חיפוש <span aria-hidden="true">←</span></button>
+      </form>
+      <div class="view-bar"><div class="view-switch" role="group" aria-label="סדר העדכונים"><button id="broad" aria-pressed="true" type="button">מבט רחב</button><button id="latest" aria-pressed="false" type="button">לפי זמן</button></div><p id="view-explanation">סבב בין קטגוריות ומקורות, כדי לראות יותר מהתמונה.</p></div>
+      <p id="notice" class="notice" role="status" hidden></p>
+      <div id="articles" class="articles" aria-busy="true"><div class="empty-state"><span class="empty-mark" aria-hidden="true">↙</span><h3>אוספים את התמונה.</h3><p>טוענים עדכונים מהמקורות.</p></div></div>
+      <button id="more" type="button" class="button more-button" hidden>לעדכונים נוספים <span aria-hidden="true">↓</span></button>
+      <div class="edition-end"><span aria-hidden="true">■</span>אפשר גם לעצור כאן. החדשות יהיו כאן כשתחזרו.</div>
+    </section>
+    <section id="approach" class="approach" aria-labelledby="approach-title"><div class="wrap">
+      <div class="section-heading"><div><span class="section-number" aria-hidden="true">02</span><h2 id="approach-title">אותן עובדות. ניסוח אחר.</h2></div></div>
+      <div class="principles"><article><span class="principle-number">01 /</span><h3>כותרת שמספרת</h3><p>כשיש מספיק מידע, הכותרת מנוסחת מחדש באופן ענייני: מה קרה, למי והיכן. בלי הבטחות, שאלות מתגרות או סימני קריאה.</p></article><article><span class="principle-number">02 /</span><h3>יותר מהתמונה</h3><p>המבט הרחב עובר בין קטגוריות ומקורות. אין דירוג לפי כעס, פחד או מספר הקלקות. חדשות קשות נשארות חלק מהתמונה.</p></article><article><span class="principle-number">03 /</span><h3>המקור תמיד ליד</h3><p>כל ידיעה מקשרת לפרסום המקורי, מציגה את זמן הפרסום ואת קטגוריות המקור, ומאפשרת להשוות לכותרת המקורית.</p></article></div>
+      <div class="editorial-note"><strong>ענייני לא אומר ורוד.</strong><p>לא משנים עובדות, לא מטשטשים נזק ולא מציגים חשד כעובדה. הניסוח האוטומטי עלול לטעות — תמיד אפשר לבדוק במקור. כשניסוח חדש אינו זמין, הכותרת מסומנת ככותרת מקור.</p></div>
+    </div></section>
+    <section class="sources-section wrap" aria-labelledby="sources-title"><div class="section-heading"><div><span class="section-number" aria-hidden="true">03</span><h2 id="sources-title">המקורות שלנו</h2></div><p>מצב העדכון מכל מקור</p></div><div id="source-status" class="sources-grid"></div><p class="source-footnote">המקורות מפרסמים באופן עצמאי. האתר אינו קשור אליהם; הזכויות בתוכן שייכות למפרסמים.</p></section>
+  </main>
+  <footer class="footer wrap"><div><strong>במבט</strong><span>חדשות בפרופורציה.</span></div><a class="text-link" href="https://github.com/igor-makarov/positivity-bias" rel="noopener noreferrer">הפרויקט בקוד פתוח <span aria-hidden="true">↗</span></a></footer>
+</body>
+</html>

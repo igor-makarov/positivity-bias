@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "websites": [
+    {
+      "id": "ynet", "name": "ynet", "domain": "ynet.co.il", "enabled": true,
+      "allowedHosts": ["ynet.co.il", "www.ynet.co.il"],
+      "feeds": [
+        { "url": "https://www.ynet.co.il/Integration/StoryRss2.xml", "category": "חדשות" },
+        { "url": "https://www.ynet.co.il/Integration/StoryRss3.xml", "category": "כלכלה" },
+        { "url": "https://www.ynet.co.il/Integration/StoryRss6.xml", "category": "ספורט" },
+        { "url": "https://www.ynet.co.il/Integration/StoryRss538.xml", "category": "תרבות" },
+        { "url": "https://www.ynet.co.il/Integration/StoryRss8.xml", "category": "בריאות" }
+      ]
+    },
+    {
+      "id": "kan", "name": "כאן", "domain": "kan.org.il", "enabled": true,
+      "allowedHosts": ["kan.org.il", "www.kan.org.il"],
+      "newsSitemap": "https://www.kan.org.il/media/sitemap/news/sitemap.xml",
+      "feeds": []
+    },
+    {
+      "id": "n12", "name": "N12", "domain": "n12.co.il", "enabled": true,
+      "allowedHosts": ["n12.co.il", "www.n12.co.il", "mako.co.il", "www.mako.co.il"],
+      "syndicationHosts": ["rcs.mako.co.il"], "deduplicationGroup": "keshet",
+      "feeds": [
+        { "url": "https://rcs.mako.co.il/rss/news-military.xml", "category": "פוליטי" },
+        { "url": "https://rcs.mako.co.il/rss/news-law.xml", "category": "פלילים ומשפט" },
+        { "url": "https://rcs.mako.co.il/rss/news-money.xml", "category": "צרכנות וכלכלה" },
+        { "url": "https://rcs.mako.co.il/rss/news-world.xml", "category": "בעולם" }
+      ]
+    },
+    {
+      "id": "mako", "name": "mako", "domain": "mako.co.il", "enabled": true,
+      "allowedHosts": ["mako.co.il", "www.mako.co.il", "n12.co.il", "www.n12.co.il"],
+      "syndicationHosts": ["rcs.mako.co.il"], "deduplicationGroup": "keshet",
+      "feeds": [
+        { "url": "https://rcs.mako.co.il/rss/c7a987610879a310VgnVCM2000002a0c10acRCRD.xml", "category": "תרבות" },
+        { "url": "https://rcs.mako.co.il/rss/cd0c4e8fc83b8310VgnVCM2000002a0c10acRCRD.xml", "category": "דיגיטל" },
+        { "url": "https://rcs.mako.co.il/rss/c7250a2610f26110VgnVCM1000005201000aRCRD.xml", "category": "אוכל" },
+        { "url": "https://rcs.mako.co.il/rss/c827a3ef43336410VgnVCM2000002a0c10acRCRD.xml", "category": "בריאות" }
+      ]
+    }
+  ]
+}

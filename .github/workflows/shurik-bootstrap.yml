@@ -1,0 +1,47 @@
+name: Start main loop
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/shurik-bootstrap.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: write
+  pull-requests: write
+concurrency:
+  group: shurik-control-main
+  cancel-in-progress: false
+jobs:
+  start:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Check whether main already has a loop
+        id: existing
+        shell: bash
+        run: |
+          if git ls-remote --exit-code origin refs/heads/shurik-control/main > /dev/null; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            status=$?
+            if [ "$status" -ne 2 ]; then exit "$status"; fi
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.existing.outputs.exists == 'false'
+        uses: igor-makarov/shurik@v1
+        with:
+          command: start
+          loop-id: main
+          workflow: shurik.yml
+          provider: opencode-go
+          model: deepseek-v4.1-flash
+          reasoning: high
+          create-pr: 'false'
+          prompt: PROMPT.md
+          work-seconds: 600
+          wait-seconds: 3600
+          checkpoint-seconds: 60
