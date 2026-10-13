@@ -39,6 +39,15 @@
     `npm run test:retirement` seed of an article with no `categories`, both shown to fail
     against the pre-fix code (TypeError / 503) and pass after it. 66 unit tests pass.
 
+37. **Live full-text extraction re-measured on real publisher pages (fresh run).**
+    Real feeds ingested `ok`: ynet 115, kan 8, n12 74, mako 61 (publisher categories
+    preserved). Sampled article bodies: ynet 3/3 `complete` (884–2,155 chars), kan 3/3
+    `complete` (2,228–2,841) and N12 3/3 `complete` (1,872–4,487). Mako was 1/3
+    `complete` (3,911) and 2/3 `missing` because the publisher answered with a Radware
+    `validate.perfdrive.com` challenge, correctly refused as `unapproved_redirect` (the
+    pipeline does not follow bot challenges and keeps the preserved original). Context
+    completeness stays transient and is never persisted or exposed.
+
 ## Verified (2026-10-13, iteration 2-16)
 
 33. **Default rewrite model switched to the available low-cost Qwen3.** Cloudflare's
