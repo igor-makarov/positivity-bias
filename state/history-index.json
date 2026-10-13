@@ -109,5 +109,14 @@
     "maxEntryId": 3878,
     "checkpointAt": "2026-10-13T17:25:01.211Z",
     "transcript": "complete"
+  },
+  {
+    "id": "2-13",
+    "outcome": "running",
+    "runId": "38439482381",
+    "minEntryId": 3879,
+    "maxEntryId": 3879,
+    "checkpointAt": "2026-10-13T17:32:59.180Z",
+    "transcript": "checkpoint"
   }
 ]
