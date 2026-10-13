@@ -10,7 +10,8 @@
     "check": "node scripts/check.js",
     "build": "wrangler deploy --dry-run --outdir dist",
     "deploy": "wrangler deploy",
-    "test:worker": "node scripts/smoke.js"
+    "test:worker": "node scripts/smoke.js",
+    "test:browser": "node scripts/browser-check.js"
   },
   "dependencies": { "fast-xml-parser": "5.11.2" },
   "devDependencies": { "wrangler": "4.150.0", "miniflare": "5.20261006.2-beta" }

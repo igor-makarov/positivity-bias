@@ -1,22 +1,9 @@
 // Local Worker-runtime checks with explicitly fictional fixtures; no external traffic.
 import assert from 'node:assert/strict';
 import { Miniflare, convertV4MiniflareOptions, Log, LogLevel } from 'miniflare';
+import { createFixtureFetch } from './fixtures.js';
 
-const publishedAt = new Date(Date.now() - 300_000).toISOString();
-let publisherRequests = 0;
-const fixtureFetch = async (request) => {
-  const url = new URL(request.url);
-  publisherRequests++;
-  if (url.pathname.includes('/sitemap/')) {
-    return new Response(`<urlset><url><loc>https://www.kan.org.il/content/kan-news/fixture</loc><news:news><news:title>לפי המועצה: 3 תוכניות אושרו</news:title><news:publication_date>${publishedAt}</news:publication_date></news:news></url></urlset>`);
-  }
-  if (url.pathname.includes('/kan-news/')) {
-    return new Response(`<html><head><script type="application/ld+json">${JSON.stringify({ '@type': 'NewsArticle', headline: 'לפי המועצה: 3 תוכניות אושרו', description: 'ידיעה בדיונית לבדיקת תוכנה בלבד.', articleSection: 'בארץ', datePublished: publishedAt })}</script></head></html>`);
-  }
-  const domain = url.hostname.includes('ynet') ? 'www.ynet.co.il' : url.pathname.includes('news-') ? 'www.n12.co.il' : 'www.mako.co.il';
-  const id = [...url.pathname].reduce((sum, char) => sum * 31 + char.charCodeAt(0) >>> 0, 0).toString(16);
-  return new Response(`<rss><channel><item><title>לפי המועצה: 3 תוכניות אושרו</title><link>https://${domain}/news/Article-${id}.htm</link><pubDate>${publishedAt}</pubDate><category>קהילה</category><description>ידיעה בדיונית לבדיקת תוכנה בלבד.</description></item></channel></rss>`);
-};
+const fixture = createFixtureFetch();
 
 const mfOptions = convertV4MiniflareOptions({
   cf: false,
@@ -27,7 +14,7 @@ const mfOptions = convertV4MiniflareOptions({
   // must set has_user_worker explicitly or the assets router cannot dispatch /api/*.
   assets: { directory: 'public', binding: 'ASSETS', run_worker_first: ['/api/*'], routerConfig: { has_user_worker: true } },
   bindings: { REWRITES_PER_REFRESH: '8' },
-  outboundService: fixtureFetch
+  outboundService: fixture.fetch
 });
 mfOptions.handleUncaughtError = (error) => console.error('Fixture runtime error:', error);
 const mf = new Miniflare(mfOptions);
@@ -50,9 +37,9 @@ try {
   assert.ok(data.categories.includes('בארץ') && data.categories.includes('קהילה'));
   assert.equal(data.stale, false);
   assert.equal(data.rewriteStatus, 'not_configured');
-  const requestsBeforeCooldown = publisherRequests;
+  const requestsBeforeCooldown = fixture.count();
   assert.equal((await (await store.fetch('https://news.internal/refresh', { method: 'POST' })).json()).state, 'cooldown');
-  assert.equal(publisherRequests, requestsBeforeCooldown);
+  assert.equal(fixture.count(), requestsBeforeCooldown);
   const filtered = await (await mf.dispatchFetch('https://fixture.local/api/news?source=kan&limit=1')).json();
   assert.equal(filtered.articles.length, 1); assert.equal(filtered.articles[0].sourceId, 'kan');
   const unmatched = await (await mf.dispatchFetch('https://fixture.local/api/news?q=nomatch')).json();
@@ -62,5 +49,5 @@ try {
   assert.equal((await mf.dispatchFetch('https://fixture.local/style.css')).status, 200);
   assert.equal((await mf.dispatchFetch('https://fixture.local/api/refresh', { method: 'POST' })).status, 405);
   assert.equal((await mf.dispatchFetch('https://fixture.local/api/unknown')).status, 404);
-  console.log(`Worker runtime passed: SQLite persistence, all four adapters, HTMLRewriter metadata, original fallback without an AI binding, categories, API filters, cooldown, and static assets (${publisherRequests} publisher requests).`);
+  console.log(`Worker runtime passed: SQLite persistence, all four adapters, HTMLRewriter metadata, original fallback without an AI binding, categories, API filters, cooldown, and static assets (${fixture.count()} publisher requests).`);
 } finally { await mf.dispose(); }
