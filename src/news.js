@@ -69,7 +69,7 @@ export function coverageOrder(articles) {
   const sorted = [...articles].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || a.id.localeCompare(b.id));
   const categories = new Map();
   for (const article of sorted) {
-    const category = article.categories[0] || '';
+    const category = article.categories?.[0] || '';
     if (!categories.has(category)) categories.set(category, new Map());
     const sources = categories.get(category);
     if (!sources.has(article.sourceId)) sources.set(article.sourceId, []);

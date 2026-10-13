@@ -25,6 +25,20 @@
     reasoning block; all three were shown to fail against the pre-fix parser
     (`invalid_response`) and pass after it. 65 unit tests pass.
 
+36. **A partial snapshot article missing `categories` crashed the whole site.**
+    `coverageOrder` (used by every refresh and by API ordering) read
+    `article.categories[0]`, and `/api/news` read `article.categories.includes(...)`,
+    `articles.flatMap((article) => article.categories)` and the client
+    `article.categories.join(...)`. A partial/corrupted snapshot that lost an article's
+    `categories` field therefore threw and turned the whole `/api/news` response into a
+    503 (and the refresh into a failure) instead of serving the preserved article.
+    `coverageOrder` now reads `article.categories?.[0]`, the API treats a missing list as
+    empty (filter, category options and the per-article `categories: []` it returns) and
+    the client renders an empty list. Valid articles (including Kan's genuinely empty
+    category list) are unchanged. Verified: a new unit regression and a
+    `npm run test:retirement` seed of an article with no `categories`, both shown to fail
+    against the pre-fix code (TypeError / 503) and pass after it. 66 unit tests pass.
+
 ## Verified (2026-10-13, iteration 2-16)
 
 33. **Default rewrite model switched to the available low-cost Qwen3.** Cloudflare's
@@ -412,14 +426,15 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Latest full validation (iteration 2-17): `npm run check`, **65 unit tests**,
+Latest full validation (iteration 2-17): `npm run check`, **66 unit tests**,
 `npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
 `npm run test:pipeline`, `npm run test:batch`, `npm run test:browser` and
 `npm run test:interaction` all pass, plus an end-to-end workerd run proving the new
 default `@cf/qwen/qwen3-30b-a3b-fp8` is selected without `REWRITE_MODEL` and its
 chat-shaped response (returned inside an inline Qwen3 reasoning wrapper) is accepted and
 clef-verified (also asserted in `npm run test:pipeline`). Iteration 2-17 fixed the
-inline-reasoning-wrapper parse failure (shown to fail pre-fix, pass after). Prior
+inline-reasoning-wrapper parse failure and the missing-`categories` serve crash (both
+shown to fail pre-fix, pass after). Prior
 iteration 2-15 covered the noise-named layout-wrapper extraction regression (shown to
 fail pre-fix, pass after); iteration 2-14 added the current-fingerprint generated-headline
 rejection serve-time regression and the clef-decision-invariant unit/pipeline regressions.

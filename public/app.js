@@ -23,7 +23,7 @@ function renderArticle(article) {
   meta.append(element('span', 'article-source', article.sourceName));
   const time = element('time', 'article-time', timeFormat.format(new Date(article.publishedAt)));
   time.dateTime = article.publishedAt;
-  meta.append(time, element('span', 'category-label', article.categories.join(' · ') || 'ללא קטגוריה במקור'));
+  meta.append(time, element('span', 'category-label', (article.categories || []).join(' · ') || 'ללא קטגוריה במקור'));
   const content = element('div', 'article-content');
   const heading = element('h3', 'article-title');
   const link = element('a', '', article.headline); link.href = url; link.rel = 'noopener noreferrer'; heading.append(link);

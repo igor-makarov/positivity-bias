@@ -74,6 +74,16 @@ test('Refresh retains good rewrites, invalidates changed source facts, and expir
   assert.equal(mergeArticles([old], [], now).length, 1);
   assert.equal(mergeArticles([story('old', 'חדשות', 'ynet', '2026-10-01T11:00:00Z')], [], now).length, 0);
 });
+test('A partial snapshot article missing its categories field never breaks ordering or merging', () => {
+  // A partial/corrupted snapshot can lose an article's categories. Serving must not
+  // crash: the whole refresh/API path runs coverageOrder and mergeArticles over every
+  // article, so a missing field would otherwise 503 the site for everyone.
+  const noCategories = { id: 'nocat', sourceId: 'kan', publishedAt: '2026-10-13T11:00:00Z',
+    originalHeadline: 'כותרת', headline: 'כותרת', description: '' };
+  assert.deepEqual(coverageOrder([noCategories]).map((article) => article.id), ['nocat']);
+  assert.deepEqual(coverageOrder([noCategories, story('b')]).map((article) => article.id), ['b', 'nocat']);
+  assert.equal(mergeArticles([noCategories], [], now).length, 1);
+});
 test('Publisher text is plain bounded text and the registry has all requested websites', () => {
   assert.equal(plainText('<script>steal()</script><p>שלום &amp; עולם</p>'), 'שלום & עולם');
   assert.deepEqual(validateWebsites(configuration).map((website) => website.domain), ['ynet.co.il', 'kan.org.il', 'n12.co.il', 'mako.co.il']);

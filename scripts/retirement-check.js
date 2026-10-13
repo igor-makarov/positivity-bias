@@ -42,7 +42,12 @@ try {
   const headless = { id: 'headless-3', url: 'https://www.ynet.co.il/news/article/3', sourceId: 'ynet', sourceName: 'ynet',
     originalHeadline: 'הצעת החוק אושרה בקריאה ראשונה', categories: ['חדשות'],
     publishedAt: new Date(Date.now() - 120_000).toISOString(), description: 'תיאור' };
-  const seeded = { articles: [article, orphan, headless], updatedAt: now, lastAttemptAt: now,
+  // A partial snapshot can also lose an article's categories entirely. The serve path must
+  // stay up (no 503) and return an empty category list instead of crashing on the field.
+  const noCategories = { id: 'nocat-4', url: 'https://www.ynet.co.il/news/article/4', sourceId: 'ynet', sourceName: 'ynet',
+    originalHeadline: 'המועצה אישרה תוכנית חדשה',
+    publishedAt: new Date(Date.now() - 180_000).toISOString(), description: 'תיאור' };
+  const seeded = { articles: [article, orphan, headless, noCategories], updatedAt: now, lastAttemptAt: now,
     rewriteStatus: 'ok', sources: [] };
   assert.equal(seeded.policyFingerprint, undefined); // the old snapshot had no policy fingerprint
   const seed = await store.fetch('https://news.internal/seed', { method: 'POST', body: JSON.stringify(seeded) });
@@ -61,6 +66,10 @@ try {
   const headlessServed = byId.get(headless.id);
   assert.equal(headlessServed.headline, headless.originalHeadline); // lost headline restored, never empty
   assert.equal(headlessServed.rewriteStatus, 'original');
+  const noCategoriesServed = byId.get(noCategories.id); // missing categories: served, not a 503
+  assert.ok(noCategoriesServed, 'article without categories was not served');
+  assert.deepEqual(noCategoriesServed.categories, []);
+  assert.equal(noCategoriesServed.headline, noCategories.originalHeadline);
 
   // The idempotent migration persisted: a later read still shows the originals.
   const again = await (await store.fetch('https://news.internal/snapshot')).json();

@@ -242,16 +242,16 @@ export default {
       if (url.pathname === '/api/status') return json(publicStatus);
       const query = (url.searchParams.get('q') || '').trim().slice(0, 120).toLocaleLowerCase('he');
       const category = url.searchParams.get('category'), source = url.searchParams.get('source');
-      let selected = articles.filter((article) => (!category || article.categories.includes(category))
+      let selected = articles.filter((article) => (!category || (article.categories || []).includes(category))
         && (!source || article.sourceId === source)
         && (!query || `${article.headline} ${article.originalHeadline} ${article.description}`.toLocaleLowerCase('he').includes(query)));
       selected = url.searchParams.get('order') === 'latest' ? [...selected].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)) : coverageOrder(selected);
       const requestedLimit = Number(url.searchParams.get('limit') || 60);
       const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(120, Math.floor(requestedLimit))) : 60;
       const offset = Math.max(0, Math.min(480, Number.parseInt(url.searchParams.get('offset') || '0', 10) || 0));
-      return json({ ...publicStatus, categories: [...new Set(articles.flatMap((article) => article.categories))].sort((a, b) => a.localeCompare(b, 'he')),
+      return json({ ...publicStatus, categories: [...new Set(articles.flatMap((article) => article.categories || []))].sort((a, b) => a.localeCompare(b, 'he')),
         total: selected.length, articles: selected.slice(offset, offset + limit).map(({ description, rewriteFingerprint, rewriteSource, rewriteStatus, context, contextCompleteness, verification, ...article }) => ({
-          ...article, rewriteStatus: rewriteStatus === 'rewritten' ? 'rewritten' : 'original' })) });
+          ...article, categories: article.categories || [], rewriteStatus: rewriteStatus === 'rewritten' ? 'rewritten' : 'original' })) });
     } catch { return json({ error: 'temporarily_unavailable' }, 503); }
   },
   async scheduled(controller, env, context) {
