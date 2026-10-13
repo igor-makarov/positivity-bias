@@ -2,7 +2,7 @@ import configuration from '../websites.json';
 import { coverageOrder, mergeArticles, validateWebsites } from './news.js';
 import { ingestSource, loadArticleContext } from './ingest.js';
 import { DEFAULT_CONTEXT_CHARS } from './extract.js';
-import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, needsRewrite, policyFingerprint, retireStaleRewrites, sourceFingerprint } from './policy.js';
+import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, REWRITE_CONTRACT_VERSION, needsRewrite, policyFingerprint, retireStaleRewrites, sourceFingerprint } from './policy.js';
 import { rewriteBatch, verifyBatch } from './rewrite.js';
 import { budgetDecision, dailyNeuronBudget, estimateBatchNeurons, fitBatchToBudget, planBatches, requestContextTokens, SHARED_RESERVED_TOKENS_PER_ITEM } from './budget.js';
 import { HOUR, refreshDue } from './refresh.js';
@@ -264,7 +264,9 @@ export default {
       const publicStatus = { updatedAt: rest.updatedAt, lastAttemptAt: rest.lastAttemptAt,
         rewriteStatus: rest.rewriteStatus, sources: rest.sources,
         stale: !rest.updatedAt || Date.now() - Date.parse(rest.updatedAt) > 2 * HOUR };
-      if (url.pathname === '/api/status') return json({ ...publicStatus, rewriteDiagnostics: rest.rewriteDiagnostics ?? null });
+      if (url.pathname === '/api/status') return json({ ...publicStatus, rewriteContract: REWRITE_CONTRACT_VERSION,
+        lastRefreshContract: rest.lastRefreshPolicy?.split('|').at(-1) ?? null,
+        rewriteDiagnostics: rest.rewriteDiagnostics ?? null });
       const query = (url.searchParams.get('q') || '').trim().slice(0, 120).toLocaleLowerCase('he');
       const category = url.searchParams.get('category'), source = url.searchParams.get('source');
       let selected = articles.filter((article) => (!category || (article.categories || []).includes(category))
