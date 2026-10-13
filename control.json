@@ -21,7 +21,7 @@
   "deadline": null,
   "seconds": 600,
   "waitSeconds": 3600,
-  "nextRunAt": "2026-10-13T14:23:58.923Z",
+  "nextRunAt": null,
   "provider": "opencode-go",
   "model": "deepseek-v4.1-flash",
   "reasoning": "high",
@@ -29,7 +29,7 @@
   "source": "9376c22f0d7d956b36eb4f617db8dcd259ad703f",
   "sourceRef": null,
   "createdAt": "2026-10-13T13:13:19.552Z",
-  "lastDispatchAt": null,
+  "lastDispatchAt": "2026-10-13T15:10:54.642Z",
   "checkpoint": {
     "workCommit": "8a87e82994d68e06451a5590463d68f33e0f2547",
     "generation": 1,
