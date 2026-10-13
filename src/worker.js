@@ -4,7 +4,7 @@ import { ingestSource, loadArticleContext } from './ingest.js';
 import { DEFAULT_CONTEXT_CHARS } from './extract.js';
 import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, needsRewrite, policyFingerprint, retireStaleRewrites, sourceFingerprint } from './policy.js';
 import { rewriteBatch, verifyBatch } from './rewrite.js';
-import { OUTPUT_TOKENS_PER_ITEM, budgetDecision, dailyNeuronBudget, estimateNeurons, estimateTokens, planBatches } from './budget.js';
+import { OUTPUT_TOKENS_PER_ITEM, budgetDecision, dailyNeuronBudget, estimateNeurons, estimateTokens, planBatches, requestContextTokens } from './budget.js';
 
 const sources = validateWebsites(configuration);
 const HOUR = 3_600_000;
@@ -135,26 +135,36 @@ export class NewsStore {
     const pending = coverageOrder(snapshot.articles.filter((article) => needsRewrite(article, fingerprint)))
       .slice(0, maxContextFetches(this.env));
     if (!pending.length) { snapshot.rewriteStatus = 'ok'; return; }
-    const batches = planBatches(pending.map((article) => ({ article, contextLength: chars })), { model });
+    // Fetch accessible article text once, bounded, so each request is sized from the
+    // actual full-text input instead of a worst-case length. Missing context is not
+    // cached and keeps the original headline.
+    const prepared = await Promise.all(pending.map(async (article) => {
+      const source = sources.find((entry) => entry.id === article.sourceId);
+      if (!source) return { article, context: { text: '', charCount: 0, completeness: 'missing' }, error: 'unknown_source' };
+      return { article, ...(await loadArticleContext(article, source, fetch, { maxChars: chars })) };
+    }));
+    const usable = prepared.filter((entry) => entry.context.text && entry.context.completeness !== 'missing');
+    if (!usable.length) { snapshot.rewriteStatus = 'context_unavailable'; return; }
+    // The same context goes to the rewrite model and the validator, so a request may
+    // only be as large as the smaller of their context windows.
+    const contextLimit = requestContextTokens([model, validator]);
+    const batches = planBatches(usable.map(({ article, context }) =>
+      ({ article, context: context.text, contextLength: context.text.length, completeness: context.completeness })),
+      { model, contextTokens: contextLimit });
     if (!batches.length) { snapshot.rewriteStatus = 'context_unavailable'; return; }
     const day = this.usageDay(now);
-    let accepted = 0, deferred = false, providerFailed = false, contextUnavailable = false;
+    let accepted = 0, deferred = false, providerFailed = false;
     for (const batch of batches) {
       const count = batch.length;
-      const estimate = estimateNeurons(model, estimateTokens('x'.repeat(chars)) * count + 400, OUTPUT_TOKENS_PER_ITEM * count)
-        + estimateNeurons(validator, (estimateTokens('x'.repeat(chars)) + 200) * count + 400, OUTPUT_TOKENS_PER_ITEM * count);
+      const inputChars = batch.reduce((sum, item) => sum + item.contextLength, 0);
+      const rewriteInput = estimateTokens('x'.repeat(inputChars)) + 400;
+      const estimate = estimateNeurons(model, rewriteInput, OUTPUT_TOKENS_PER_ITEM * count)
+        + estimateNeurons(validator, rewriteInput + 200 * count, OUTPUT_TOKENS_PER_ITEM * count);
       const reservation = this.reserveUsage(day, estimate);
       if (!reservation.allowed) { deferred = true; break; }
-      const prepared = await Promise.all(batch.map(async ({ article }) => {
-        const source = sources.find((entry) => entry.id === article.sourceId);
-        if (!source) return { article, context: { text: '', completeness: 'missing' }, error: 'unknown_source' };
-        return { article, ...(await loadArticleContext(article, source, fetch, { maxChars: chars })) };
-      }));
-      const usable = prepared.filter((entry) => entry.context.text && entry.context.completeness !== 'missing');
-      if (!usable.length) { this.reconcileUsage(day, estimate, 0); contextUnavailable = true; continue; }
-      const items = usable.map(({ article, context }) => ({ id: article.id, sourceName: article.sourceName,
+      const items = batch.map(({ article, context, completeness }) => ({ id: article.id, sourceName: article.sourceName,
         originalHeadline: article.originalHeadline, publishedAt: article.publishedAt,
-        context: context.text, contextCompleteness: context.completeness }));
+        context, contextCompleteness: completeness }));
       const rewrite = await rewriteBatch(items, this.env, { model });
       if (rewrite.status === 'provider_unavailable' || rewrite.status === 'budget_guard') {
         this.reconcileUsage(day, estimate, rewrite.usage ?? 0);
@@ -177,7 +187,7 @@ export class NewsStore {
       // articles are not re-fetched and re-inferred every refresh. Provider/parse
       // failures and missing context are not cached and may be retried.
       if (['ok', 'partial', 'rejected'].includes(rewrite.status) && ['ok', 'partial', 'rejected'].includes(verified.status)) {
-        for (const { article } of usable) {
+        for (const { article } of batch) {
           if (verified.accepted.has(article.id)) continue;
           article.rewriteStatus = 'rejected';
           article.rewriteFingerprint = fingerprint;
@@ -187,7 +197,7 @@ export class NewsStore {
       if (verified.status === 'provider_unavailable') { snapshot.rewriteStatus = 'provider_unavailable'; providerFailed = true; break; }
     }
     snapshot.rewriteStatus = providerFailed ? snapshot.rewriteStatus
-      : accepted ? 'ok' : deferred ? 'budget_deferred' : contextUnavailable ? 'context_unavailable' : 'ok';
+      : accepted ? 'ok' : deferred ? 'budget_deferred' : 'ok';
   }
 }
 

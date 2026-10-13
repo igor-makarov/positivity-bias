@@ -36,20 +36,30 @@ export function budgetDecision(used, estimate, budget) {
   return { allowed: true, remaining: remaining - estimate };
 }
 
-// Split pending articles into requests that fit both the model context window and a
-// reserved output space. Article context is never truncated to fit more articles:
-// an article that cannot fit on its own is deferred, not shortened.
-export function planBatches(items, { model, promptTokens = 1_600, outputTokensPerItem = OUTPUT_TOKENS_PER_ITEM } = {}) {
-  const contextTokens = MODEL_CONTEXT_TOKENS[model] || 32_768;
-  const usableInputTokens = contextTokens - outputTokensPerItem * 4 - promptTokens;
+// The shared article context is sent to BOTH the rewrite model and the validator, so
+// a request may only be as large as the smallest context window in the pair. Returns
+// the most restrictive documented window, with a conservative default for unknowns.
+export function requestContextTokens(models = []) {
+  const windows = models.map((model) => MODEL_CONTEXT_TOKENS[model]).filter((value) => Number.isFinite(value));
+  return windows.length ? Math.min(...windows) : 32_768;
+}
+
+// Split pending articles into requests that fit the model context window and a
+// reserved output space of one complete short result per article. Article context is
+// never truncated to fit more articles: an article that cannot fit on its own is
+// deferred, not shortened. Pass `contextTokens` to size requests for the smaller of
+// the rewrite and validator models (see requestContextTokens).
+export function planBatches(items, { model, contextTokens, promptTokens = 1_600, outputTokensPerItem = OUTPUT_TOKENS_PER_ITEM } = {}) {
+  const limit = Number.isFinite(contextTokens) ? contextTokens : MODEL_CONTEXT_TOKENS[model] || 32_768;
+  const fits = (inputTokens, count) => promptTokens + inputTokens + count * outputTokensPerItem <= limit;
   const batches = [];
   let current = [];
   let currentTokens = 0;
   for (const item of items) {
     const chars = item.contextLength ?? String(item.context ?? '').length;
     const itemTokens = Math.ceil(chars / ESTIMATED_CHARS_PER_TOKEN) + 128;
-    if (itemTokens > usableInputTokens) continue;
-    if (current.length && currentTokens + itemTokens > usableInputTokens) {
+    if (!fits(itemTokens, 1)) continue; // deferred: cannot fit even alone, never truncated
+    if (current.length && !fits(currentTokens + itemTokens, current.length + 1)) {
       batches.push(current);
       current = [];
       currentTokens = 0;
