@@ -83,21 +83,19 @@ or missing) to the model. The editorial prompt requires the primary point and it
 material context — actor/speaker, action, geographic scope and result — and never
 reverses an outcome. Missing context keeps the original headline.
 
-A candidate is then checked with `@cf/cloudflare/clef-flash`, Cloudflare's decision
-model. It is **not** a chat/completion model: it takes a `state` (the candidate records)
-plus a map of typed `questions`, and returns a probability per question. The verifier
-sends two `noul` (yes/no) questions per candidate — is every claim supported by the
-source, and are the primary point and material context preserved without misleading
-omission, broadening, narrowing or changed emphasis? A candidate is accepted only when
-both probabilities are a confident yes (>= `CLEF_ACCEPT_PROBABILITY`, 0.7); a
-weakly-positive or uncertain verdict, like any unsupported or incomplete candidate,
-falls back to the preserved original. Calls are chunked to the documented 64-question
-and 24,576-token limits. Clef is charged for input tokens only.
+The rewrite call proposes three distinct dry alternatives per article. Clef Flash
+compares them against the same source with one native `choice` question per article,
+including an explicit `original` fallback. A qualifying alternative must both support
+every asserted claim and preserve the primary point and material context. Only a
+consistent, confident selection (0.7 or higher) publishes a changed headline. Missing,
+malformed or uncertain answers preserve originals and remain retryable at the next
+edition; a confident original selection is cached. Calls respect the 64-question and
+24,576-token limits. Clef charges input tokens only.
 
 Rewrite requests use a JSON schema with short, request-local article IDs; those IDs
 are restored to the original article identity before factual verification or storage.
 The native binding's already-parsed JSON output is supported. Validation permits
-only Clef Flash. A changed policy can recover a failed pipeline once within the
+only Clef Flash. A changed policy gets one immediate refresh within the
 current refresh window, with its attempt and neuron reservation persisted before work.
 Qwen uses its documented raw chat format with a closed thinking prefix. A complete
 schema document returned through the alternate channel is still only a candidate;
@@ -107,11 +105,25 @@ Requests are sized adaptively from the actual full-text input, the context windo
 reserved output space and the remaining daily budget. The same context goes to both
 the rewrite model and the validator, so each request is limited to the **smaller** of
 their context windows (`clef-flash` is 24,576 tokens) and output space is reserved per
-article (a full short rewrite plus the two clef questions). The project reserves a
+article (three full short alternatives plus the choice question). The project reserves a
 conservative slice of the shared **10,000-neuron/day** free allocation
 (`DAILY_NEURON_BUDGET`, default 6000), persists the reservation before any model
 call, reconciles it with provider-reported usage, and defers work instead of
 overspending. No billing upgrade, retries or automatic budget increase.
+
+Each edition processes the retained backlog in at most 14 finite chunks, with progress
+persisted between Durable Object alarms. Feed and article redirects share a counter
+below the Free plan's 50-external-request ceiling. Each article gets at most one model
+attempt per edition. Inaccessible bodies wait a day before another fetch, so they do
+not starve untouched articles. Processing stops on provider failures or budget limits.
+The existing ingestion cron remains hourly; this is not a Codex monitor or Shurik loop.
+`/api/status` reports real changed-title coverage across the full feed, missing-source
+and pending counts, and the project's daily neuron ledger. Unknown provider usage
+keeps the conservative reservation rather than being counted as zero.
+
+The UI presents originals with smaller, regular-weight, readable gray type, while
+converted titles retain the stronger hierarchy. Authored controls use SVG icons and
+CSS shapes rather than emoji or Unicode icon glyphs; publisher originals are preserved.
 
 Accepted rewrites are cached with a policy fingerprint covering the model, the
 full-context extraction policy, the editorial prompt and the validator version, and

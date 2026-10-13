@@ -92,6 +92,6 @@ export async function ingestSource(source, previous, now = Date.now(), fetcher =
 }
 
 export function safeError(error) {
-  return /^(source_http_\d+|unapproved_url|unapproved_redirect|response_too_large|empty_response|too_many_redirects|invalid_xml|not_a_feed|not_a_news_sitemap)$/.test(error?.message)
+  return /^(source_http_\d+|unapproved_url|unapproved_redirect|response_too_large|empty_response|too_many_redirects|invalid_xml|not_a_feed|not_a_news_sitemap|subrequest_budget)$/.test(error?.message)
     ? error.message : error?.name === 'TimeoutError' || error?.name === 'AbortError' ? 'timeout' : 'fetch_failed';
 }

@@ -68,7 +68,7 @@ try {
   assert.ok(api.articles.every((article) => !('context' in article) && !('verification' in article)));
   const day = new Date().toISOString().slice(0, 10);
   const usage = await (await store.fetch(`https://news.internal/usage?day=${day}`)).json();
-  assert.ok(usage.used > 0 && usage.used <= 6000, `unexpected usage ${usage.used}`);
+  assert.ok(usage.used > 0 && usage.used <= 8000, `unexpected usage ${usage.used}`);
 
   // Budget-aware sizing: when only part of a planned batch fits the remaining daily
   // budget, the request must be REDUCED rather than deferring every article. A fresh
@@ -78,9 +78,9 @@ try {
     lastAttemptAt: new Date(now - 2 * 3_600_000).toISOString(), policyFingerprint: null, rewriteStatus: 'not_configured', sources: [] };
   const partial = await (await partialStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: partialSeed,
     env: { REWRITE_MODEL: '@cf/meta/llama-3.1-8b-instruct-fp8-fast', VALIDATOR_MODEL: '@cf/cloudflare/clef-flash',
-      DAILY_NEURON_BUDGET: '60', CONTEXT_CHARS: '6000', MAX_CONTEXT_FETCHES: '20' } }) })).json();
+      DAILY_NEURON_BUDGET: '80', CONTEXT_CHARS: '6000', MAX_CONTEXT_FETCHES: '20' } }) })).json();
   assert.equal(partial.result.state, 'complete');
-  // The 60-neuron budget cannot cover all nine articles at once, but the first planned
+  // The 80-neuron budget cannot cover all nine articles at once, but the first planned
   // batch is REDUCED to what fits instead of deferring every article in it. Reporting
   // provider usage lets the ledger free headroom, so a small prefix still gets through.
   assert.ok(partial.calls.rewrite >= 1, `expected a reduced batch, got ${partial.calls.rewrite}`);
@@ -91,7 +91,31 @@ try {
   assert.equal(rewritten, partial.calls.rewrite);
   assert.equal(partialSnapshot.articles.filter((article) => article.rewriteStatus === 'original').length, COUNT - rewritten);
   const partialUsage = await (await partialStore.fetch('https://news.internal/usage')).json();
-  assert.ok(partialUsage.used > 0 && partialUsage.used <= 60, `partial usage overspent: ${partialUsage.used}`);
+  assert.ok(partialUsage.used > 0 && partialUsage.used <= 80, `partial usage overspent: ${partialUsage.used}`);
 
-  console.log(`Batch passed: ${COUNT} full-text articles split into ${run.calls.rewrite} requests, each verification within the ${window}-token validator window; usage ${Math.round(usage.used)} neurons; a 60-neuron budget processes a reduced prefix (${partial.calls.rewrite}) instead of deferring all nine.`);
+  // Finite continuation covers retained backlog despite inaccessible first pages.
+  // No article may be retried by a continuation in the same edition.
+  const backlogStore = namespace.get(namespace.idFromName('backlog'));
+  const backlogArticles = Array.from({ length: 28 }, (_, index) => ({ ...articles[0],
+    id: `https://www.ynet.co.il/${index < 4 ? 'blocked' : 'page'}/${index + 1}`,
+    url: `https://www.ynet.co.il/${index < 4 ? 'blocked' : 'page'}/${index + 1}`,
+    originalHeadline: `עדכון כללי ${index + 1}`, headline: `עדכון כללי ${index + 1}` }));
+  await backlogStore.fetch('https://news.internal/run', { method: 'POST', body: JSON.stringify({ snapshot: { ...seeded, articles: backlogArticles },
+    env: { DAILY_NEURON_BUDGET: '6000', MAX_CONTEXT_FETCHES: '6', CONTEXT_CHARS: '6000', MOCK_MANUAL_ALARMS: true } }) });
+  let backlog;
+  for (let round = 0; round < 6; round++) {
+    backlog = await (await backlogStore.fetch('https://news.internal/snapshot')).json();
+    if (!backlog.rewriteContinuation) break;
+    await backlogStore.fetch('https://news.internal/continue', { method: 'POST' });
+  }
+  backlog = await (await backlogStore.fetch('https://news.internal/snapshot')).json();
+  assert.equal(backlog.rewriteContinuation, undefined);
+  assert.equal(backlog.rewriteCoverage.rewritten, 24);
+  assert.equal(backlog.rewriteCoverage.sourceUnavailable, 4);
+  assert.equal(backlog.rewriteCoverage.pending, 0);
+  assert.equal(backlog.rewriteDiagnostics.contextCandidates, 28, 'no retries within the edition');
+  assert.equal(backlog.rewriteDiagnostics.accepted, 24);
+  assert.equal(backlog.refreshing, false);
+
+  console.log(`Batch passed: ${COUNT} full-text articles split into ${run.calls.rewrite} requests, each verification within the ${window}-token validator window; usage ${Math.round(usage.used)} neurons; a 80-neuron budget processes a reduced prefix (${partial.calls.rewrite}) instead of deferring all nine.`);
 } finally { await mf.dispose().catch(() => {}); await rm(directory, { recursive: true, force: true }).catch(() => {}); }

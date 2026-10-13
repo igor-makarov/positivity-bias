@@ -19,7 +19,7 @@
     "VALIDATOR_MODEL": "@cf/cloudflare/clef-flash",
     "DAILY_NEURON_BUDGET": "6000",
     "CONTEXT_CHARS": "6000",
-    "MAX_CONTEXT_FETCHES": "20"
+    "MAX_CONTEXT_FETCHES": "40"
   },
   "observability": { "enabled": true }
 }

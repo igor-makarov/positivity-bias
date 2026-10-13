@@ -15,7 +15,8 @@ await build({ entryPoints: ['scripts/retirement-probe.js'], bundle: true, format
 const mf = new Miniflare(convertV4MiniflareOptions({
   cf: false, name: 'positivity-bias', scriptPath: outfile, modules: true, compatibilityDate: '2026-10-13',
   durableObjects: { NEWS: { className: 'SeedableStore', useSQLite: true } },
-  assets: { directory: 'public', binding: 'ASSETS', run_worker_first: ['/api/*'], routerConfig: { has_user_worker: true } }
+  assets: { directory: 'public', binding: 'ASSETS', run_worker_first: ['/api/*'], routerConfig: { has_user_worker: true } },
+  outboundService: async () => new Response('not found', { status: 404 })
 }));
 
 try {

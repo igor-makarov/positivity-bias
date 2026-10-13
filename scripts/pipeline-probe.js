@@ -19,11 +19,12 @@ function createMockAI(validatorModel, rewriteMode, validatorMode) {
       // A validator that answers none of the questions is a failed verification, not a
       // healthy refresh: the rewrite must be surfaced as invalid, not reported as `ok`.
       if (validatorMode === 'empty') return { model: 'clef-flash', answers: {}, usage: { input_tokens: 1000, output_tokens: 0 } };
-      // clef answers are `noul` probabilities keyed by the candidate index.
+      // Native Clef choice answers select an alternative or the original fallback.
       const answers = {};
       input.state.forEach((item, index) => {
-        answers[`${index}_supported`] = { type: 'noul', noul: 1 };
-        answers[`${index}_preserved`] = { type: 'noul', noul: /\/2$/.test(item.id) ? 0 : 1 };
+        const choice = /\/2$/.test(item.id) ? 'original' : 'option_1';
+        answers[`${index}_headline`] = { type: 'choice', choice, confidence: 1,
+          probabilities: Object.fromEntries([...item.alternatives.map(({ id }) => id), 'original'].map((id) => [id, id === choice ? 1 : 0])) };
       });
       return { model: 'clef-flash', answers, usage: { input_tokens: 1000, output_tokens: 0 } };
     }
@@ -46,10 +47,10 @@ function createMockAI(validatorModel, rewriteMode, validatorMode) {
     // answered, so `/2` is a model omission, not a rejection decision.
     if (rewriteMode === 'partial') {
       const answered = items.filter((item) => item.originalHeadline === 'לפי המועצה: 3 תוכניות אושרו');
-      return envelope(JSON.stringify({ items: answered.map((item) => ({ id: item.id, usable: true, headline: 'לפי המועצה אושרו 3 תוכניות' })) }));
+      return envelope(JSON.stringify({ items: answered.map((item) => ({ id: item.id, usable: true, headlines: ['לפי המועצה אושרו 3 תוכניות', 'לפי המועצה ניתן אישור ל-3 תוכניות', 'אושרו 3 תוכניות לפי המועצה'] })) }));
     }
     return envelope(JSON.stringify({ items: items.map((item) => ({ id: item.id, usable: true,
-      headline: item.originalHeadline.includes('האוכלוסייה') ? 'ראשי ערים קראו לשינוי דמוגרפי בישראל' : 'לפי המועצה אושרו 3 תוכניות' })) }));
+      headlines: item.originalHeadline.includes('האוכלוסייה') ? ['ראשי ערים קראו לשינוי דמוגרפי בישראל', 'ראשי ערים הציעו לשנות את האוכלוסייה בישראל', 'ראשי ערים מבקשים שינוי באוכלוסיית ישראל'] : ['לפי המועצה אושרו 3 תוכניות', 'לפי המועצה ניתן אישור ל-3 תוכניות', 'אושרו 3 תוכניות לפי המועצה'] })) }));
   };
   return { calls, run };
 }

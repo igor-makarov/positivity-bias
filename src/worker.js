@@ -2,17 +2,16 @@ import configuration from '../websites.json';
 import { coverageOrder, mergeArticles, validateWebsites } from './news.js';
 import { ingestSource, loadArticleContext } from './ingest.js';
 import { DEFAULT_CONTEXT_CHARS } from './extract.js';
-import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, REWRITE_CONTRACT_VERSION, needsRewrite, policyFingerprint, retireStaleRewrites, sourceFingerprint } from './policy.js';
+import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, REWRITE_CONTRACT_VERSION, policyFingerprint, retireStaleRewrites, sourceFingerprint } from './policy.js';
 import { rewriteBatch, verifyBatch } from './rewrite.js';
 import { budgetDecision, dailyNeuronBudget, estimateBatchNeurons, fitBatchToBudget, planBatches, requestContextTokens, SHARED_RESERVED_TOKENS_PER_ITEM } from './budget.js';
 import { HOUR, refreshDue } from './refresh.js';
+import { boundedPublisherFetch, pendingArticles, rewriteCoverage } from './progress.js';
 
 const sources = validateWebsites(configuration);
-// A repaired policy may recover one failed rewrite attempt immediately. Persist
+// A changed policy gets one immediate refresh. Persist
 // the policy before work, so repeated readers cannot bypass the hourly guard.
-const policyRecoveryDue = (snapshot, env) => (['invalid_response', 'provider_unavailable', 'validator_misconfigured'].includes(snapshot.rewriteStatus)
-  || Boolean(snapshot.rewriteDiagnostics?.failureStage))
-  && snapshot.lastRefreshPolicy !== policyFingerprint(env);
+const policyRecoveryDue = (snapshot, env) => snapshot.lastRefreshPolicy !== policyFingerprint(env);
 
 const json = (body, status = 200) => Response.json(body, { status, headers: {
   'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
@@ -23,7 +22,7 @@ const contextChars = (env) => {
 };
 const maxContextFetches = (env) => {
   const value = Number(env.MAX_CONTEXT_FETCHES);
-  return Number.isFinite(value) ? Math.max(0, Math.min(40, Math.floor(value))) : 20;
+  return Number.isFinite(value) ? Math.max(0, Math.min(40, Math.floor(value))) : 40;
 };
 
 export class NewsStore {
@@ -93,7 +92,9 @@ export class NewsStore {
     if (refreshDue(snapshot.lastAttemptAt) || policyRecoveryDue(snapshot, this.env)) {
       this.state.waitUntil(this.refresh());
     }
-    return json({ ...snapshot, refreshing: Boolean(this.refreshing) });
+    return json({ ...snapshot, refreshing: Boolean(this.refreshing || snapshot.rewriteContinuation),
+      rewriteCoverage: rewriteCoverage(snapshot.articles, policyFingerprint(this.env)),
+      dailyNeurons: { used: Math.round(this.readUsage(this.usageDay())), budget: dailyNeuronBudget(this.env) } });
   }
 
   emptySnapshot() {
@@ -112,32 +113,68 @@ export class NewsStore {
     const now = Date.now();
     if (!refreshDue(previous.lastAttemptAt, now) && !policyRecoveryDue(previous, this.env)) return { state: 'cooldown' };
     // Persist the attempt before network work so failed refreshes cannot create request storms.
-    const snapshot = { ...previous, lastAttemptAt: new Date(now).toISOString(), lastRefreshPolicy: policyFingerprint(this.env) };
+    const snapshot = { ...previous, lastAttemptAt: new Date(now).toISOString(), lastRefreshPolicy: policyFingerprint(this.env), rewriteDiagnostics: null };
+    delete snapshot.rewriteContinuation;
     this.writeSnapshot(snapshot);
+    const publisherFetch = boundedPublisherFetch(fetch);
     const incoming = [], statuses = [];
     for (const source of sources) {
-      const result = await ingestSource(source, previous.articles, now);
+      const result = await ingestSource(source, previous.articles, now, publisherFetch);
       incoming.push(...result.articles);
       const lastGood = previous.sources.find((status) => status.id === source.id)?.lastSuccessAt;
       statuses.push({ ...result.status, lastSuccessAt: result.status.received ? snapshot.lastAttemptAt : lastGood || null });
     }
     snapshot.articles = mergeArticles(previous.articles, incoming, now);
     snapshot.sources = statuses;
-    await this.rewritePending(snapshot, now);
+    await this.rewritePending(snapshot, now, publisherFetch);
     if (incoming.length) snapshot.updatedAt = snapshot.lastAttemptAt;
-    this.writeSnapshot(snapshot);
+    snapshot.rewriteContinuation = { policy: policyFingerprint(this.env), day: this.usageDay(now), roundsLeft: 13 };
+    await this.finishRewriteChunk(snapshot, now);
     return { state: 'complete', articles: snapshot.articles.length, rewriteStatus: snapshot.rewriteStatus,
       sources: statuses.map(({ id, state }) => ({ id, state })) };
+  }
+
+  async finishRewriteChunk(snapshot, now) {
+    const continuation = snapshot.rewriteContinuation;
+    const pending = pendingArticles(snapshot.articles, policyFingerprint(this.env), now, 1, Date.parse(snapshot.lastAttemptAt));
+    const hasBudget = this.readUsage(this.usageDay(now)) < dailyNeuronBudget(this.env);
+    const more = continuation?.roundsLeft > 0 && pending.length && hasBudget && snapshot.rewriteStatus !== 'budget_deferred'
+      && !snapshot.rewriteDiagnostics?.failureStage && !['provider_unavailable', 'validator_misconfigured', 'budget_guard'].includes(snapshot.rewriteStatus);
+    if (!more) delete snapshot.rewriteContinuation;
+    this.writeSnapshot(snapshot);
+    if (more) await this.state.storage.setAlarm(Date.now() + 1_000);
+    else await this.state.storage.deleteAlarm();
+  }
+
+  // These alarms finish one edition's finite backlog. Each article gets at most one
+  // model attempt per edition; no visitor-controlled retries or recurring monitor.
+  async alarm() {
+    if (this.refreshing) { await this.refreshing; return; }
+    this.refreshing = this.continueRewrites().finally(() => { this.refreshing = null; });
+    return this.refreshing;
+  }
+
+  async continueRewrites() {
+    const snapshot = this.readSnapshot();
+    const continuation = snapshot.rewriteContinuation;
+    const now = Date.now();
+    if (!continuation) return;
+    if (continuation.policy !== policyFingerprint(this.env) || continuation.day !== this.usageDay(now)) {
+      delete snapshot.rewriteContinuation; this.writeSnapshot(snapshot); return;
+    }
+    continuation.roundsLeft--;
+    await this.rewritePending(snapshot, now, boundedPublisherFetch(fetch));
+    await this.finishRewriteChunk(snapshot, now);
   }
 
   // Adaptive, token-budgeted rewriting. Each request is sized from the actual
   // full-text input, the model context window, reserved output space and the
   // remaining daily neuron budget. Batches never truncate article context to fit
   // more articles; work is deferred instead when budget or context is insufficient.
-  async rewritePending(snapshot, now) {
-    const diagnostics = snapshot.rewriteDiagnostics = {
+  async rewritePending(snapshot, now, publisherFetch = boundedPublisherFetch(fetch)) {
+    const diagnostics = snapshot.rewriteDiagnostics ||= {
       contextCandidates: 0, contextUsable: 0, rewriteCalls: 0, validatorBatches: 0,
-      answered: 0, proposed: 0, verified: 0, accepted: 0, failureStage: null, finishReason: null,
+      answered: 0, proposed: 0, alternatives: 0, choiceAnswered: 0, uncertainChoices: 0, verified: 0, accepted: 0, failureStage: null, finishReason: null,
       outputShape: null, returnedItems: 0, contentChars: 0, reasoningChars: 0, responseChannel: null
     };
     const fingerprint = policyFingerprint(this.env);
@@ -145,9 +182,10 @@ export class NewsStore {
     const validator = this.env.VALIDATOR_MODEL || DEFAULT_VALIDATOR_MODEL;
     if (!this.env.AI) { snapshot.rewriteStatus = 'not_configured'; return; }
     const chars = contextChars(this.env);
-    const pending = coverageOrder(snapshot.articles.filter((article) => needsRewrite(article, fingerprint)))
-      .slice(0, maxContextFetches(this.env));
-    diagnostics.contextCandidates = pending.length;
+    if (this.readUsage(this.usageDay(now)) >= dailyNeuronBudget(this.env)) { snapshot.rewriteStatus = 'budget_deferred'; return; }
+    const pending = pendingArticles(snapshot.articles, fingerprint, now,
+      Math.min(maxContextFetches(this.env), publisherFetch.remaining()), Date.parse(snapshot.lastAttemptAt));
+    diagnostics.contextCandidates += pending.length;
     if (!pending.length) { snapshot.rewriteStatus = 'ok'; return; }
     // Fetch accessible article text once, bounded, so each request is sized from the
     // actual full-text input instead of a worst-case length. Missing context is not
@@ -155,16 +193,23 @@ export class NewsStore {
     const prepared = await Promise.all(pending.map(async (article) => {
       const source = sources.find((entry) => entry.id === article.sourceId);
       if (!source) return { article, context: { text: '', charCount: 0, completeness: 'missing' }, error: 'unknown_source' };
-      return { article, ...(await loadArticleContext(article, source, fetch, { maxChars: chars })) };
+      return { article, ...(await loadArticleContext(article, source, publisherFetch, { maxChars: chars })) };
     }));
+    for (const { article, context, error } of prepared) {
+      article.rewriteAttemptAt = new Date(now).toISOString();
+      article.rewriteAttemptPolicy = fingerprint;
+      article.rewriteAttemptSource = sourceFingerprint(article);
+      article.contextState = error === 'subrequest_budget' ? 'deferred'
+        : context.text && context.completeness !== 'missing' ? 'available' : 'missing';
+    }
     const usable = prepared.filter((entry) => entry.context.text && entry.context.completeness !== 'missing');
-    diagnostics.contextUsable = usable.length;
+    diagnostics.contextUsable += usable.length;
     if (!usable.length) { snapshot.rewriteStatus = 'context_unavailable'; return; }
     // The same context goes to the rewrite model and the validator, so a request may
     // only be as large as the smaller of their context windows.
     const contextLimit = requestContextTokens([model, validator]);
     // The shared rewrite+verify request reserves a complete short rewrite result plus
-    // the two factual/preservation questions asked per candidate by the validator.
+    // the choice question and alternatives evaluated per article by the validator.
     const batches = planBatches(usable.map(({ article, context }) =>
       ({ article, context: context.text, contextLength: context.text.length, completeness: context.completeness })),
       { model, contextTokens: contextLimit, outputTokensPerItem: SHARED_RESERVED_TOKENS_PER_ITEM });
@@ -189,6 +234,7 @@ export class NewsStore {
       diagnostics.rewriteCalls++;
       diagnostics.answered += rewrite.evaluated?.size ?? 0;
       diagnostics.proposed += rewrite.candidates.length;
+      diagnostics.alternatives += rewrite.candidates.reduce((count, candidate) => count + candidate.headlines.length, 0);
       diagnostics.returnedItems += rewrite.returnedItems ?? 0;
       if (rewrite.outputShape) diagnostics.outputShape = rewrite.outputShape;
       diagnostics.contentChars += rewrite.envelope?.contentChars ?? 0;
@@ -206,21 +252,24 @@ export class NewsStore {
         providerFailed = true;
         break;
       }
-      let spent = rewrite.usage ?? null;
       const verified = rewrite.candidates.length
         ? await verifyBatch(rewrite.candidates, this.env, { model: validator })
         : { accepted: new Map(), rejected: new Set(), evaluated: new Set(), usage: null, status: 'rejected' };
       if (rewrite.candidates.length) diagnostics.validatorBatches++;
       diagnostics.verified += verified.evaluated?.size ?? 0;
+      diagnostics.choiceAnswered += verified.answered?.size ?? 0;
+      diagnostics.uncertainChoices += (verified.answered?.size ?? 0) - (verified.evaluated?.size ?? 0);
       diagnostics.accepted += verified.accepted.size;
-      if (rewrite.candidates.length && (verified.evaluated?.size ?? 0) === 0) diagnostics.failureStage = 'verification';
-      if (verified.usage != null) spent = (spent ?? 0) + verified.usage;
-      this.reconcileUsage(day, estimate, spent ?? estimate);
+      if (rewrite.candidates.length && (verified.answered?.size ?? 0) === 0) diagnostics.failureStage = 'verification';
+      // Unknown usage keeps its reservation; never treat absent provider usage as zero.
+      const spent = rewrite.usage == null || (rewrite.candidates.length && verified.usage == null)
+        ? estimate : rewrite.usage + (verified.usage ?? 0);
+      this.reconcileUsage(day, estimate, spent);
       // A clef response that decided NONE of the submitted candidates is a failed
       // verification, not a healthy refresh: report it honestly (and keep originals)
       // instead of a misleading `ok` that would hide a non-functioning validator. A
       // partial answer or a legitimate rejection of every candidate is not affected.
-      if (rewrite.candidates.length && (verified.evaluated?.size ?? 0) === 0) invalidResponse = true;
+      if (rewrite.candidates.length && (verified.answered?.size ?? 0) === 0) invalidResponse = true;
       for (const [id, headline] of verified.accepted) {
         const article = snapshot.articles.find((entry) => entry.id === id);
         if (article) { article.headline = headline; article.rewriteStatus = 'rewritten'; article.rewriteFingerprint = fingerprint; }
@@ -248,7 +297,7 @@ export class NewsStore {
       if (verified.status === 'provider_unavailable' || verified.status === 'validator_misconfigured') { snapshot.rewriteStatus = verified.status; providerFailed = true; break; }
     }
     snapshot.rewriteStatus = providerFailed ? snapshot.rewriteStatus
-      : invalidResponse ? accepted ? 'partial' : 'invalid_response' : accepted ? 'ok' : deferred ? 'budget_deferred' : 'ok';
+      : invalidResponse ? accepted ? 'partial' : 'invalid_response' : deferred ? 'budget_deferred' : 'ok';
   }
 }
 
@@ -264,10 +313,11 @@ export default {
       const { articles = [], ...rest } = snapshot;
       const publicStatus = { updatedAt: rest.updatedAt, lastAttemptAt: rest.lastAttemptAt,
         rewriteStatus: rest.rewriteStatus, sources: rest.sources, refreshing: rest.refreshing === true,
+        rewriteCoverage: rest.rewriteCoverage,
         stale: !rest.updatedAt || Date.now() - Date.parse(rest.updatedAt) > 2 * HOUR };
       if (url.pathname === '/api/status') return json({ ...publicStatus, rewriteContract: REWRITE_CONTRACT_VERSION,
         lastRefreshContract: rest.lastRefreshPolicy?.split('|').at(-1) ?? null,
-        rewriteDiagnostics: rest.rewriteDiagnostics ?? null });
+        rewriteDiagnostics: rest.rewriteDiagnostics ?? null, dailyNeurons: rest.dailyNeurons });
       const query = (url.searchParams.get('q') || '').trim().slice(0, 120).toLocaleLowerCase('he');
       const category = url.searchParams.get('category'), source = url.searchParams.get('source');
       let selected = articles.filter((article) => (!category || (article.categories || []).includes(category))
@@ -278,7 +328,7 @@ export default {
       const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(120, Math.floor(requestedLimit))) : 60;
       const offset = Math.max(0, Math.min(480, Number.parseInt(url.searchParams.get('offset') || '0', 10) || 0));
       return json({ ...publicStatus, categories: [...new Set(articles.flatMap((article) => article.categories || []))].sort((a, b) => a.localeCompare(b, 'he')),
-        total: selected.length, articles: selected.slice(offset, offset + limit).map(({ description, rewriteFingerprint, rewriteSource, rewriteStatus, context, contextCompleteness, verification, ...article }) => ({
+        total: selected.length, articles: selected.slice(offset, offset + limit).map(({ description, rewriteFingerprint, rewriteSource, rewriteStatus, context, contextCompleteness, verification, rewriteAttemptAt, rewriteAttemptPolicy, rewriteAttemptSource, contextState, ...article }) => ({
           ...article, categories: article.categories || [], rewriteStatus: rewriteStatus === 'rewritten' ? 'rewritten' : 'original' })) });
     } catch { return json({ error: 'temporarily_unavailable' }, 503); }
   },

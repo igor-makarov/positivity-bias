@@ -2,8 +2,8 @@
 // rewrite and checked again at read/serve time, so a rewrite produced by an older
 // pipeline (or an older grounding/verification policy) can never be displayed.
 
-export const EDITORIAL_VERSION = 'editorial-v3';
-export const REWRITE_CONTRACT_VERSION = 'structured-ids-v3';
+export const EDITORIAL_VERSION = 'editorial-options-v4';
+export const REWRITE_CONTRACT_VERSION = 'structured-options-v4';
 // v2: bounded HTMLRewriter body extraction with navigation/advertising/related removed.
 // v3: a noise-named layout wrapper (e.g. Bootstrap's "row navigation") wrapping the
 // whole page no longer suppresses <main>; live Kan article pages now yield a complete
@@ -15,7 +15,9 @@ export const CONTEXT_POLICY = 'full-text-v3';
 // v3: a candidate is accepted only on a confident yes; a weakly-positive or uncertain
 // probability keeps the preserved original (the previous >=0.5 boundary accepted the
 // maximally uncertain 0.5 verdict).
-export const VALIDATOR_VERSION = 'clef-guard-v3';
+// v4: three alternatives, one native choice with an original fallback; malformed
+// or uncertain choices are never cached as source-grounded rejections.
+export const VALIDATOR_VERSION = 'clef-choice-v4';
 
 // First-choice low-cost rewrite model. `@cf/qwen/qwen3-30b-a3b-fp8` documents Hebrew
 // support, has a 32,768-token window and is cheaper on output tokens than the previous

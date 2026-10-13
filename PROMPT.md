@@ -1,5 +1,14 @@
 # Positivity Bias / במבט — maintain the news outlet
 
+Current user steering (2026-10-13): Shurik and the hourly Codex checkup are STOPPED.
+Do not resume them. Product work now targets genuine rewrite coverage of at least
+90% of recent feed titles, with originals de-emphasized and no emoji UI controls.
+Use the deployed three-alternative/native-choice pipeline described in README.md;
+keep full accessible grounding, factual/material-context checks and the existing
+6,000-neuron budget. Report the actual denominator and measured result; do not count
+unchanged copies or missing articles as conversions. These instructions supersede
+older supervisor/loop and single-candidate guidance below.
+
 Work directly on `main` in igor-makarov/positivity-bias. The user explicitly
 authorized this branch and ongoing Shurik work. Do not open PRs or merge branches.
 Use the task checkout supplied by Shurik, not its engine checkout.
@@ -80,8 +89,8 @@ Use the full article and original title to ground this selection. If the rewrite
 schema includes essential-fact/evidence fields, generate them in the SAME bounded
 call, keep evidence snippets short/internal, and count them in the daily budget;
 do not add another expensive preprocessing stage or new visible UI fields.
-Clef verification must ask separately whether (1) every asserted claim is supported
-and (2) the primary point and material context are preserved without misleading
+Clef selection must evaluate both (1) whether every asserted claim is supported
+and (2) whether the primary point and material context are preserved without misleading
 omission, broadening, narrowing or changed emphasis. A merely plausible/entailed
 but incomplete headline must fail the second check. Use the combined existing
 verification request, preserve per-article independence, and fall back to originals
@@ -127,7 +136,7 @@ The user explicitly authorizes bigger batches and higher article throughput.
 Replace the arbitrary 8-headline/hour and 1024-total-output-token/hour limits with
 adaptive token-budgeted batching. Size each request from the actual full-text
 input, model context window, reserved output space, and remaining daily neuron
-budget. Reserve enough output tokens for one complete short result per article.
+budget. Reserve enough output tokens for three complete short alternatives per article.
 Do not truncate article context merely to fit more articles into a batch.
 
 Keep stable per-article IDs, clear article boundaries, independent validation,

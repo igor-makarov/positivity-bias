@@ -11,6 +11,16 @@ function element(tag, className, value) {
   return node;
 }
 
+function icon(kind) {
+  const paths = { external: 'M7 17 17 7M7 7h10v10', down: 'M12 4v16m-6-6 6 6 6-6' };
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'ui-icon'); svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false');
+  const path = document.createElementNS(svg.namespaceURI, 'path');
+  path.setAttribute('d', paths[kind]); svg.append(path);
+  return svg;
+}
+
 function safeLink(value) {
   try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password ? url.href : null; } catch { return null; }
 }
@@ -18,7 +28,7 @@ function safeLink(value) {
 function renderArticle(article) {
   const url = safeLink(article.url);
   if (!url) return null;
-  const row = element('article', 'article');
+  const row = element('article', article.rewriteStatus === 'rewritten' ? 'article' : 'article article-unconverted');
   const meta = element('div', 'article-meta');
   meta.append(element('span', 'article-source', article.sourceName));
   const time = element('time', 'article-time', timeFormat.format(new Date(article.publishedAt)));
@@ -35,7 +45,7 @@ function renderArticle(article) {
   }
   const action = element('div', 'article-action');
   const originalLink = element('a', 'text-link', 'לכתבה במקור'); originalLink.href = url; originalLink.rel = 'noopener noreferrer';
-  const arrow = element('span', '', '↖'); arrow.setAttribute('aria-hidden', 'true'); originalLink.append(arrow);
+  originalLink.append(icon('external'));
   action.append(originalLink, element('span', article.rewriteStatus === 'rewritten' ? 'rewrite-label edited' : 'rewrite-label', article.rewriteStatus === 'rewritten' ? 'ניסוח ענייני' : 'כותרת מקור'));
   row.append(meta, content, action);
   return row;
@@ -43,7 +53,7 @@ function renderArticle(article) {
 
 function emptyState(title, copy, retry = false) {
   const block = element('div', 'empty-state');
-  const mark = element('span', 'empty-mark', '↙'); mark.setAttribute('aria-hidden', 'true');
+  const mark = element('span', 'empty-mark'); mark.setAttribute('aria-hidden', 'true'); mark.append(icon('down'));
   block.append(mark, element('h3', '', title), element('p', '', copy));
   if (retry) { const button = element('button', 'button', 'לנסות שוב'); button.type = 'button'; button.addEventListener('click', () => load()); block.append(button); }
   return block;
@@ -106,7 +116,7 @@ async function load(append = false, refreshPoll = false) {
   } finally {
     if (requestId === state.requestId) {
       state.loading = false; $('articles').setAttribute('aria-busy', 'false'); $('more').disabled = false;
-      if (refreshing && !append && state.refreshPolls < 10) {
+      if (refreshing && !append && state.refreshPolls < 60) {
         state.refreshPolls++;
         state.refreshTimer = setTimeout(() => {
           // Preserve an unsubmitted search and cancel stale polling on interaction.

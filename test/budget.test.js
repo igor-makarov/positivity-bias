@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_DAILY_NEURON_BUDGET, MAX_DAILY_NEURON_BUDGET, SHARED_RESERVED_TOKENS_PER_ITEM, VERIFY_QUESTION_CHARS_PER_CANDIDATE, budgetDecision, dailyNeuronBudget, estimateBatchNeurons, estimateNeurons, estimateTokens, fitBatchToBudget, planBatches, requestContextTokens } from '../src/budget.js';
+import { DEFAULT_DAILY_NEURON_BUDGET, MAX_DAILY_NEURON_BUDGET, SHARED_RESERVED_TOKENS_PER_ITEM, OUTPUT_TOKENS_PER_ITEM, VERIFY_QUESTION_CHARS_PER_CANDIDATE, budgetDecision, dailyNeuronBudget, estimateBatchNeurons, estimateNeurons, estimateTokens, fitBatchToBudget, planBatches, requestContextTokens } from '../src/budget.js';
 import { MODEL_CONTEXT_TOKENS, MODEL_NEURON_RATES } from '../src/policy.js';
 
 test('The daily budget defaults conservatively and never exceeds the free allocation', () => {
@@ -74,7 +74,7 @@ test('Requests are limited by the smaller of the rewrite and validator context w
     contextTokens: requestContextTokens(['@cf/meta/llama-3.1-8b-instruct-fp8-fast', '@cf/cloudflare/clef-flash']) });
   assert.ok(shared.length > rewriteOnly.length); // the smaller validator window forces more splits
   const itemTokens = Math.ceil(6000 / 1.5) + 128;
-  for (const batch of shared) assert.ok(1600 + batch.length * itemTokens + batch.length * 180 <= clefWindow);
+  for (const batch of shared) assert.ok(1600 + batch.length * itemTokens + batch.length * OUTPUT_TOKENS_PER_ITEM <= clefWindow);
 });
 
 test('The shared reservation covers the clef questions and clef charges no output tokens', () => {
@@ -82,7 +82,7 @@ test('The shared reservation covers the clef questions and clef charges no outpu
   const items = [{ id: 'a', contextLength: 6000 }];
   const estimate = estimateBatchNeurons({ rewrite: '@cf/meta/llama-3.1-8b-instruct-fp8-fast', validator: '@cf/cloudflare/clef-flash' }, items);
   const verifyInput = estimateTokens('x'.repeat(6000 + VERIFY_QUESTION_CHARS_PER_CANDIDATE)) + 400;
-  const expected = estimateNeurons('@cf/meta/llama-3.1-8b-instruct-fp8-fast', estimateTokens('x'.repeat(6000)) + 400, 180)
+  const expected = estimateNeurons('@cf/meta/llama-3.1-8b-instruct-fp8-fast', estimateTokens('x'.repeat(6000)) + 1600 + 256, OUTPUT_TOKENS_PER_ITEM)
     + estimateNeurons('@cf/cloudflare/clef-flash', verifyInput, 0);
   assert.ok(Math.abs(estimate - expected) < 1e-6);
   // The clef output rate is zero: requested output never adds neurons.
@@ -94,7 +94,7 @@ test('Output space is reserved per article, not as a fixed amount', () => {
   const batches = planBatches(items, { model: '@cf/qwen/qwen3-30b-a3b-fp8', contextTokens: 32_768 });
   assert.equal(batches.flat().length, 10);
   assert.ok(batches.length > 1); // 10 * (3000 input + 180 output) cannot fit one 32k request
-  for (const batch of batches) assert.ok(1600 + batch.length * 3000 + batch.length * 180 <= 32_768);
+  for (const batch of batches) assert.ok(1600 + batch.length * 3000 + batch.length * OUTPUT_TOKENS_PER_ITEM <= 32_768);
 });
 
 test('Batch size is reduced to the remaining daily budget without truncating context', () => {

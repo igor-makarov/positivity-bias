@@ -11,13 +11,13 @@ import { MODEL_CONTEXT_TOKENS, modelNeuronRate } from './policy.js';
 export const DEFAULT_DAILY_NEURON_BUDGET = 6_000;
 export const MAX_DAILY_NEURON_BUDGET = 10_000;
 export const ESTIMATED_CHARS_PER_TOKEN = 1.5; // deliberately conservative for Hebrew + JSON wrappers
-export const OUTPUT_TOKENS_PER_ITEM = 180; // one complete short headline (and one verdict)
-// Clef is asked two typed yes/no questions per candidate; the shared request must
+export const OUTPUT_TOKENS_PER_ITEM = 540; // three complete Hebrew alternatives and the schema wrapper
+// Clef is asked one typed choice question per article, including three alternatives; the shared request must
 // reserve that instruction/JSON overhead in addition to the article context.
-export const VERIFY_QUESTION_CHARS_PER_CANDIDATE = 1_400;
+export const VERIFY_QUESTION_CHARS_PER_CANDIDATE = 2_600;
 export const VERIFY_QUESTION_TOKENS_PER_CANDIDATE = Math.ceil(VERIFY_QUESTION_CHARS_PER_CANDIDATE / ESTIMATED_CHARS_PER_TOKEN);
-// One shared rewrite+verify request reserves a full short rewrite result plus the two
-// clef questions per candidate.
+// One shared rewrite+verify request reserves a full short rewrite result plus the choice
+// question and alternatives per article.
 export const SHARED_RESERVED_TOKENS_PER_ITEM = OUTPUT_TOKENS_PER_ITEM + VERIFY_QUESTION_TOKENS_PER_CANDIDATE;
 
 export function estimateTokens(value) {
@@ -50,7 +50,7 @@ export function budgetDecision(used, estimate, budget) {
 export function estimateBatchNeurons(models, items = []) {
   const count = items.length;
   const contextChars = items.reduce((sum, item) => sum + (item.contextLength ?? String(item.context ?? '').length), 0);
-  const rewriteInput = estimateTokens('x'.repeat(contextChars)) + 400;
+  const rewriteInput = estimateTokens('x'.repeat(contextChars)) + 1_600 + count * 256;
   const verifyInput = estimateTokens('x'.repeat(contextChars + count * VERIFY_QUESTION_CHARS_PER_CANDIDATE)) + 400;
   return estimateNeurons(models.rewrite, rewriteInput, OUTPUT_TOKENS_PER_ITEM * count)
     + estimateNeurons(models.validator, verifyInput, 0);
@@ -80,7 +80,7 @@ export function requestContextTokens(models = []) {
 }
 
 // Split pending articles into requests that fit the model context window and a
-// reserved output space of one complete short result per article. Article context is
+// reserved output space of three complete short alternatives per article. Article context is
 // never truncated to fit more articles: an article that cannot fit on its own is
 // deferred, not shortened. Pass `contextTokens` to size requests for the smaller of
 // the rewrite and validator models (see requestContextTokens).
