@@ -1,6 +1,7 @@
 // Central editorial/AI policy. The fingerprint below is written onto every accepted
 // rewrite and checked again at read/serve time, so a rewrite produced by an older
 // pipeline (or an older grounding/verification policy) can never be displayed.
+import { materialHeadlineSafe } from './headline-guard.js';
 
 export const EDITORIAL_VERSION = 'editorial-options-v4';
 export const REWRITE_CONTRACT_VERSION = 'structured-options-v8';
@@ -136,7 +137,8 @@ export function retireStaleRewrites(articles, fingerprint) {
     const hasDecision = article.rewriteStatus === 'rewritten' || article.rewriteStatus === 'rejected'
       || article.rewriteFingerprint != null || generated;
     if (!hasDecision) return article;
-    if (usable && article.rewriteFingerprint === fingerprint && article.rewriteStatus === 'rewritten') return article;
+    if (usable && article.rewriteFingerprint === fingerprint && article.rewriteStatus === 'rewritten'
+      && materialHeadlineSafe(article.originalHeadline, article.headline)) return article;
     // A cached rejection is a decision to display the PRESERVED original headline. Trust
     // it only when it actually carries that original: a partial/corrupted snapshot could
     // leave `rejected` with a generated headline, which the public API maps to

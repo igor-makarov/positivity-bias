@@ -1,4 +1,5 @@
 import { plainText } from './text.js';
+import { materialHeadlineSafe } from './headline-guard.js';
 import { OUTPUT_TOKENS_PER_ITEM, estimateNeurons, ESTIMATED_CHARS_PER_TOKEN, VERIFY_QUESTION_CHARS_PER_CANDIDATE } from './budget.js';
 import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, CHEAP_MODELS, isClefModel, MODEL_CONTEXT_TOKENS } from './policy.js';
 
@@ -27,6 +28,10 @@ turn a success into a failure or an approval into a rejection). Do not broaden o
 narrow the claim's scope, do not present a quote as fact, and never invent a policy
 demand, motive or explanation. If two speakers or places are named, keep the actual
 ones; do not replace them with a wider or different group.
+Keep denials, rebuttals, explicit demands, injury severity and material contrasts.
+Do not turn critical injury into a generic hospital visit or a demand to withdraw
+into a generic protest. Use complete Hebrew acronyms with the Hebrew ״ mark, not
+ASCII quotation marks inside acronyms; never cut a word at a quotation mark.
 
 If the body is missing or too thin for a faithful, complete headline, or the original
 cannot be corrected without losing material context, set usable=false. Never guess.
@@ -206,6 +211,7 @@ export function acceptRewrite(item, result) {
   if (result?.usable !== true || typeof result.headline !== 'string') return null;
   const headline = plainText(result.headline, 300);
   if (!headline || headline.length > 180 || !/[\u05d0-\u05ea]/.test(headline) || /[!?<>]|https?:|\p{Extended_Pictographic}/u.test(headline)) return null;
+  if (!materialHeadlineSafe(item.originalHeadline, headline)) return null;
   const sourceText = `${item.originalHeadline || ''} ${item.context || item.description || ''}`;
   const supportedNumbers = numberTokens(sourceText);
   if (numberTokens(headline).some((number) => !supportedNumbers.includes(number))) return null;

@@ -124,6 +124,12 @@ The existing ingestion cron remains hourly; this is not a Codex monitor or Shuri
 and pending counts, and the project's daily neuron ledger. Unknown provider usage
 keeps the conservative reservation rather than being counted as zero.
 
+Source-visible material guards also run on cached titles before serving them. They
+reject clipped Hebrew acronyms, inherited hype, lost denials/rebuttals, softened
+critical injury, changed withdrawal demands and unattributed long source quotations.
+A failing title returns to its marked original; valid siblings remain cached. These
+checks enforce the existing editorial policy and do not replace full-text validation.
+
 The UI presents originals with smaller, regular-weight, readable gray type, while
 converted titles retain the stronger hierarchy. Authored controls use SVG icons and
 CSS shapes rather than emoji or Unicode icon glyphs; publisher originals are preserved.

@@ -19,10 +19,20 @@
   Unknown provider usage retains reservations. Status reports actual full-feed coverage.
 - Originals use quieter readable typography; authored UI glyphs replaced with SVG
   icons and CSS shapes. Responsive interaction checks pass.
-- Local validation: 72 unit tests; syntax/build; pipeline, shared-window/budget and
+- Local validation: 78 unit tests; syntax/build; pipeline, shared-window/budget and
   28-article continuation fixture (24 rewritten, 4 inaccessible, zero retries), malformed-batch isolation and concurrent refresh/continuation handling.
-- Live rollout and real conversion/quality measurement pending. The 90% target is
-  not yet verified; source access limits continue to preserve originals.
+- Live run completed all 238 retained titles: 117 accessible bodies,
+  all 117 rewrite responses answered, 93 proposed sets reviewed by native Clef,
+  zero pipeline failures; project ledger 5,123/6,000 neurons. All four feeds healthy.
+- Spot review caught malformed acronyms and missing denials/severity/attribution.
+  Added source-visible material guards to both candidate acceptance and serve-time
+  cache retirement. The captured edition retains 44 changed titles (18.5%); 19
+  defective cached rewrites revert to marked originals without additional inference.
+- The 90% full-feed target is unmet: 121/238 bodies are inaccessible; other titles
+  remain original when no sufficiently complete rewrite is verified. Passing model
+  checks is not proof of factual fidelity. Shurik and both Codex check-ins are disabled.
+- Live UI: SVG controls verified; originals render at 18px, weight 400, readable #555.
+  Search/filter/sort/pagination and layouts at 320/390/768/1440 pass without errors.
 
 ## Live-site repair (2026-10-13)
 
