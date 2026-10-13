@@ -29,12 +29,13 @@
   "source": "9376c22f0d7d956b36eb4f617db8dcd259ad703f",
   "sourceRef": null,
   "createdAt": "2026-10-13T13:13:19.552Z",
-  "lastDispatchAt": null,
+  "lastDispatchAt": "2026-10-13T13:13:21.421Z",
   "checkpoint": {
     "workCommit": "9376c22f0d7d956b36eb4f617db8dcd259ad703f",
     "generation": 1,
     "sequence": "initialize",
     "runId": null,
     "at": "2026-10-13T13:13:19.584Z"
-  }
+  },
+  "pr": null
 }
