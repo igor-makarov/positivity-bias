@@ -61,7 +61,7 @@ export class NewsStore {
       statuses.push({ ...result.status, lastSuccessAt: result.status.received ? snapshot.lastAttemptAt : lastGood || null });
     }
     snapshot.articles = mergeArticles(previous.articles, incoming, now);
-    const fingerprint = `${this.env.REWRITE_MODEL || DEFAULT_REWRITE_MODEL}:editorial-v1`;
+    const fingerprint = `${this.env.REWRITE_MODEL || DEFAULT_REWRITE_MODEL}:editorial-v2`;
     const configuredLimit = Number(this.env.REWRITES_PER_REFRESH ?? 8);
     const limit = Number.isFinite(configuredLimit) ? Math.max(0, Math.min(8, Math.floor(configuredLimit))) : 8;
     const pending = coverageOrder(snapshot.articles.filter((article) => article.rewriteStatus !== 'rewritten' || article.rewriteFingerprint !== fingerprint)).slice(0, limit);

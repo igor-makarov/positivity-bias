@@ -39,8 +39,13 @@
    original-title label. Screenshot inspection confirmed correct RTL layout at both
    widths. Interactive QA (keyboard traversal, filter/order/pagination interactions,
    error states) is still pending.
+5. **Headline guards tightened.** `acceptRewrite` now also rejects question marks
+   (rhetorical questions) and sensational terms the source did not contain
+   (e.g. בהלם / מזעזע / לא תאמינו), so a rewrite cannot add drama the publisher did
+   not use. The rewrite fingerprint was bumped to `editorial-v2`. Unit coverage: 21
+   tests pass.
 
-Validation at handoff plus this iteration: `npm run check`, all 20 unit tests,
+Validation at handoff plus this iteration: `npm run check`, all 21 unit tests,
 `npm run build` (dry run), `npm run test:worker`, and `npm run test:browser` pass.
 
 ## Blocked / needs input
@@ -54,7 +59,7 @@ Validation at handoff plus this iteration: `npm run check`, all 20 unit tests,
    Workers AI Hebrew quality, the native `AI` binding, JSON response shape, and real
    neuron use are unverified (no deployment). Keep the 8-attempt/hour, 1024-token,
    cheap-model-allowlist limits; prefer honest originals on failure.
-5. Factual-headline validation can be strengthened with observed rewrite errors once
-   live inference is reachable.
+5. Factual-headline validation can still be strengthened with observed rewrite errors
+   once live inference is reachable (names/quotes/causal claims are not yet guarded).
 
 Steering goes through `PROMPT.md`; further implementation belongs to Shurik.

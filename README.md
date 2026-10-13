@@ -73,8 +73,9 @@ quality and actual usage before increasing scope.
 
 Accepted rewrites are persisted and reused while source title/excerpt and model
 configuration are unchanged. The original remains visible. Missing AI binding, quota/provider
-failures, rejected numbers/uncertainty changes, and insufficient context fall back
-to an explicitly labeled original title. Automated guards cannot fully prove factual
+failures, rejected numbers/uncertainty changes, newly added sensational framing or
+rhetorical questions, and insufficient context fall back to an explicitly labeled
+original title. Automated guards cannot fully prove factual
 fidelity; editorial review is still useful. Set `REWRITES_PER_REFRESH` to 0 to pause
 new inference without removing accepted headlines.
 

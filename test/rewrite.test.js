@@ -14,6 +14,13 @@ test('Changed numbers, dropped attribution, certainty changes and emotional outp
   assert.equal(acceptRewrite(allegation, result('3 בני אדם נעצרו בגין הונאה')), null);
   assert.equal(acceptRewrite(allegation, result('3 בני אדם נעצרו בחשד להונאה')), '3 בני אדם נעצרו בחשד להונאה');
 });
+test('A rewrite may not introduce rhetorical questions or new sensational framing', () => {
+  assert.equal(acceptRewrite(article, result('מה קרה באירוע שבו נפצעו 3 בני אדם?')), null);
+  assert.equal(acceptRewrite(article, result('בהלם: לפי המשטרה, 3 בני אדם נפצעו באירוע')), null);
+  assert.equal(acceptRewrite(article, result('מזעזע: לפי המשטרה, 3 בני אדם נפצעו באירוע')), null);
+  const alreadySensational = { ...article, originalHeadline: 'מזעזע: לפי המשטרה, 3 בני אדם נפצעו באירוע' };
+  assert.equal(acceptRewrite(alreadySensational, result('מזעזע: לפי המשטרה, 3 בני אדם נפצעו באירוע')), 'מזעזע: לפי המשטרה, 3 בני אדם נפצעו באירוע');
+});
 test('No AI binding means original fallback', async () => {
   const response = await rewriteBatch([article], {});
   assert.equal(response.status, 'not_configured'); assert.equal(response.results.size, 0);
