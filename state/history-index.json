@@ -22,11 +22,11 @@
   },
   {
     "id": "2-3",
-    "outcome": "running",
+    "outcome": "yielded",
     "runId": "38421657242",
     "minEntryId": 472,
-    "maxEntryId": 1008,
+    "maxEntryId": 1032,
     "checkpointAt": "2026-10-13T15:43:54.086Z",
-    "transcript": "checkpoint"
+    "transcript": "complete"
   }
 ]
