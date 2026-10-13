@@ -79,6 +79,7 @@
     drone-test headline (`...השלימה בהצלחה ניסוי במל״ט שמצויד במקלע`, kan-news/defense/1108988),
     but kan article pages are client-rendered shells (42 chars → `missing`), so that
     article keeps its preserved original rather than being rewritten from chrome.
+    (Superseded by 2-15: the noise-wrapper fix now extracts a complete Kan body.)
     Context completeness stays transient and is never persisted or exposed.
 
 ## Verified (2026-10-13, iteration 2-12)
@@ -301,7 +302,9 @@
 
 10. **Honest limitation recorded:** kan article pages are client-rendered, so their
     initial HTML body is only navigation (42 chars) — kan keeps original headlines
-    under the new policy instead of being fed chrome. Its JSON-LD still supplies the
+    under the new policy instead of being fed chrome. (Superseded by 2-15: a
+    noise-named layout wrapper was suppressing `<main>`; Kan now extracts a complete
+    body and is rewritten normally.) Its JSON-LD still supplies the
     headline; categories remain missing (no `articleSection`).
 
 ## Verified (2026-10-13, iteration 2-4)
