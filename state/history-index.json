@@ -8,5 +8,14 @@
     "checkpointAt": "2026-10-13T13:23:18.146Z",
     "error": "\"\"",
     "transcript": "complete"
+  },
+  {
+    "id": "1-2",
+    "outcome": "running",
+    "runId": "38419826476",
+    "minEntryId": 409,
+    "maxEntryId": 409,
+    "checkpointAt": "2026-10-13T15:11:22.536Z",
+    "transcript": "checkpoint"
   }
 ]
