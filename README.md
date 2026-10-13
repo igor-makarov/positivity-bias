@@ -87,10 +87,11 @@ The rewrite call proposes three distinct dry alternatives per article. Clef Flas
 compares them against the same source with one native `choice` question per article,
 including an explicit `original` fallback. A qualifying alternative must both support
 every asserted claim and preserve the primary point and material context. Only a
-consistent, confident selection (0.7 or higher) publishes a changed headline. Missing,
+consistent selection whose option probability is 0.7 or higher publishes a changed headline. Missing,
 malformed or uncertain answers preserve originals and remain retryable at the next
 edition; a confident original selection is cached. Calls respect the 64-question and
-24,576-token limits. Clef charges input tokens only.
+24,576-token limits. Clef charges input tokens only. Native distribution confidence is diagnostic metadata;
+the acceptance boundary uses the selected option probability, which can differ from it.
 
 Rewrite requests use a JSON schema with short, request-local article IDs; those IDs
 are restored to the original article identity before factual verification or storage.

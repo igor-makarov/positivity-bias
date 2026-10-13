@@ -128,11 +128,18 @@ test('Only a confident, consistent native choice can publish a rewrite', async (
   assert.equal((await verifyBatch([candidate()], selectionEnv({ '0_headline': good }))).accepted.size, 1);
   const invalid = [answer('option_1', 0.5), { ...good, confidence: NaN }, { ...good, type: 'noul' },
     { ...good, choice: 'unknown' }, { ...good, probabilities: {} }, { ...good, probabilities: { ...good.probabilities, original: 0.99 } },
-    { ...good, confidence: 0.99 }, null];
+    { ...good, confidence: 2 }, null];
   for (const value of invalid) {
     const result = await verifyBatch([candidate()], selectionEnv({ '0_headline': value }));
     assert.equal(result.accepted.size, 0); assert.equal(result.rejected.size, 0);
   }
+});
+test('Native distribution certainty can differ from the selected option probability', async () => {
+  const native = { ...answer('option_1', 0.8), confidence: 0.25 };
+  const result = await verifyBatch([candidate()], selectionEnv({ '0_headline': native }));
+  assert.equal(result.accepted.get(base.id), faithful);
+  assert.equal(result.answerShape.confidence, 0.25);
+  assert.equal(result.answerShape.selectedProbability, 0.8);
 });
 test('A weak choice is answered but undecided, without being cached as a rejection', async () => {
   const result = await verifyBatch([candidate()], selectionEnv({ '0_headline': answer('option_1', 0.5) }));

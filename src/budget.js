@@ -14,7 +14,7 @@ export const ESTIMATED_CHARS_PER_TOKEN = 1.5; // deliberately conservative for H
 export const OUTPUT_TOKENS_PER_ITEM = 540; // three complete Hebrew alternatives and the schema wrapper
 // Clef is asked one typed choice question per article, including three alternatives; the shared request must
 // reserve that instruction/JSON overhead in addition to the article context.
-export const VERIFY_QUESTION_CHARS_PER_CANDIDATE = 2_600;
+export const VERIFY_QUESTION_CHARS_PER_CANDIDATE = 3_300;
 export const VERIFY_QUESTION_TOKENS_PER_CANDIDATE = Math.ceil(VERIFY_QUESTION_CHARS_PER_CANDIDATE / ESTIMATED_CHARS_PER_TOKEN);
 // One shared rewrite+verify request reserves a full short rewrite result plus the choice
 // question and alternatives per article.

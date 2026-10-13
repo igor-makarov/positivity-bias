@@ -10,7 +10,7 @@
 ## Rewrite coverage and UI (2026-10-13)
 
 - Three grounded alternatives per article; one native Clef Flash choice, explicit
-  original fallback, stable option IDs, 0.7 confidence guard and strict response checks.
+  original fallback, stable option IDs, 0.7 option-probability guard and strict response checks.
   Unchanged echoes cannot count as conversions. Fingerprints retire prior decisions.
 - Finite backlog continuation (at most 14 chunks per edition), persisted attempts,
   a shared 44-external-request guard, and a day-long inaccessible-body cooldown.
@@ -18,7 +18,7 @@
   Unknown provider usage retains reservations. Status reports actual full-feed coverage.
 - Originals use quieter readable typography; authored UI glyphs replaced with SVG
   icons and CSS shapes. Responsive interaction checks pass.
-- Local validation: 65 unit tests; syntax/build; pipeline, shared-window/budget and
+- Local validation: 66 unit tests; syntax/build; pipeline, shared-window/budget and
   28-article continuation fixture (24 rewritten, 4 inaccessible, zero retries).
 - Live rollout and real conversion/quality measurement pending. The 90% target is
   not yet verified; source access limits continue to preserve originals.

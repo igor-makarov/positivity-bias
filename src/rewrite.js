@@ -86,7 +86,8 @@ function clefRequest(candidates) {
   const questions = Object.fromEntries(candidates.map((candidate, index) => [`${index}_headline`, {
     type: 'choice', instructions: `For record at index ${index} of state: ${VERIFICATION_PROMPT}`,
     criteria: Object.fromEntries([
-      ...headlineOptions(candidate).map(({ id }) => [id, `Select alternative ${id} only if it qualifies; prefer the best qualifying alternative.`]),
+      ...headlineOptions(candidate).map(({ id, headline }) => [id,
+        `Headline: ${JSON.stringify(headline)}. Select only if every claim is supported, the primary point and material context are preserved, and wording is dry. Prefer the best qualifying headline.`]),
       ['original', 'Keep the original because none of the alternatives qualifies.']
     ])
   }]));
@@ -106,7 +107,9 @@ function parseChoice(answer, candidate) {
   if (!probabilities || Object.keys(probabilities).length !== ids.length
     || ids.some((id) => !Number.isFinite(probabilities[id]) || probabilities[id] < 0 || probabilities[id] > 1)) return null;
   const sum = ids.reduce((total, id) => total + probabilities[id], 0);
-  if (Math.abs(sum - 1) > 0.02 || Math.abs(probabilities[answer.choice] - answer.confidence) > 0.02
+  // Native Workers AI confidence measures distribution certainty and differs from
+  // the selected option probability. Check the distribution itself, not equality.
+  if (Math.abs(sum - 1) > 0.02
     || ids.some((id) => probabilities[id] > probabilities[answer.choice] + 0.001)) return null;
   return answer;
 }
@@ -341,7 +344,7 @@ export async function verifyBatch(candidates, env, { model = env.VALIDATOR_MODEL
       const answer = parseChoice(answers[`${index}_headline`], candidate);
       if (!answer) return;
       answered.add(candidate.id);
-      if (answer.confidence < CLEF_ACCEPT_PROBABILITY) return;
+      if (answer.probabilities[answer.choice] < CLEF_ACCEPT_PROBABILITY) return;
       if (answer.choice === 'original') rejected.add(candidate.id);
       else {
         const selected = headlineOptions(candidate).find(({ id }) => id === answer.choice)?.headline;
