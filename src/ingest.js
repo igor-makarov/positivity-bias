@@ -1,4 +1,5 @@
-import { articleKey, articleMetadata, canonicalUrl, coverageOrder, parseFeed, parseNewsSitemap, validDate } from './news.js';
+import { articleKey, canonicalUrl, coverageOrder, parseFeed, parseNewsSitemap, validDate } from './news.js';
+import { prepareContext, readArticleData } from './extract.js';
 
 export async function fetchPublisher(url, source, fetcher = fetch) {
   let target = canonicalUrl(url, source, true);
@@ -32,23 +33,23 @@ export async function fetchPublisher(url, source, fetcher = fetch) {
   throw new Error('too_many_redirects');
 }
 
-export async function readMetadata(html) {
-  const scripts = [], meta = {};
-  let current = null;
-  const rewritten = new HTMLRewriter()
-    .on('script[type="application/ld+json"]', {
-      element(element) { current = { value: '' }; scripts.push(current); },
-      text(chunk) { if (current && current.value.length < 150_000) current.value += chunk.text; }
-    })
-    .on('meta', { element(element) {
-      const name = element.getAttribute('property') || element.getAttribute('name');
-      if (['og:title', 'og:description', 'description', 'article:section', 'article:published_time'].includes(name)) meta[name] = element.getAttribute('content');
-    } }).transform(new Response(html));
-  await rewritten.text();
-  return articleMetadata(scripts.map((script) => script.value), meta);
+// Full accessible article text for inference context only. The extracted body is
+// returned transiently and is never persisted on the article or exposed by the API.
+export async function loadArticleContext(article, source, fetcher = fetch, contextOptions) {
+  try {
+    const { body: html } = await fetchPublisher(article.url, source, fetcher);
+    const data = await readArticleData(html);
+    return { context: prepareContext(data.body, contextOptions), bodyChars: (data.body || '').length, headline: data.headline };
+  } catch (error) {
+    return { context: { text: '', charCount: 0, completeness: 'missing' }, error: safeError(error) };
+  }
 }
 
-export async function ingestSource(source, previous, now = Date.now(), fetcher = fetch, metadataReader = readMetadata) {
+export async function readMetadata(html) {
+  return readArticleData(html);
+}
+
+export async function ingestSource(source, previous, now = Date.now(), fetcher = fetch, metadataReader = readArticleData) {
   const articles = [], errors = [];
   let succeeded = 0;
   for (const feed of source.feeds || []) {

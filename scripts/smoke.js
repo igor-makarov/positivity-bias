@@ -13,7 +13,7 @@ const mfOptions = convertV4MiniflareOptions({
   // Wrangler marks the Worker as the user worker; the raw Miniflare v4 options
   // must set has_user_worker explicitly or the assets router cannot dispatch /api/*.
   assets: { directory: 'public', binding: 'ASSETS', run_worker_first: ['/api/*'], routerConfig: { has_user_worker: true } },
-  bindings: { REWRITES_PER_REFRESH: '8' },
+  bindings: {},
   outboundService: fixture.fetch
 });
 mfOptions.handleUncaughtError = (error) => console.error('Fixture runtime error:', error);

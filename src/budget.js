@@ -46,7 +46,8 @@ export function planBatches(items, { model, promptTokens = 1_600, outputTokensPe
   let current = [];
   let currentTokens = 0;
   for (const item of items) {
-    const itemTokens = estimateTokens(item.context) + 120;
+    const chars = item.contextLength ?? String(item.context ?? '').length;
+    const itemTokens = Math.ceil(chars / ESTIMATED_CHARS_PER_TOKEN) + 128;
     if (itemTokens > usableInputTokens) continue;
     if (current.length && currentTokens + itemTokens > usableInputTokens) {
       batches.push(current);

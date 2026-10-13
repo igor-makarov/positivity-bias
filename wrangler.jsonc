@@ -16,7 +16,10 @@
   "ai": { "binding": "AI" },
   "vars": {
     "REWRITE_MODEL": "@cf/meta/llama-3.1-8b-instruct-fp8-fast",
-    "REWRITES_PER_REFRESH": "8"
+    "VALIDATOR_MODEL": "@cf/cloudflare/clef-flash",
+    "DAILY_NEURON_BUDGET": "6000",
+    "CONTEXT_CHARS": "6000",
+    "MAX_CONTEXT_FETCHES": "20"
   },
   "observability": { "enabled": true }
 }
