@@ -90,41 +90,35 @@ Official references:
 
 ## Priorities for the next iterations
 
-0. Complete the existing local runtime smoke test in `scripts/smoke.js`. Node
-   unit tests and Wrangler dry-run build passed before handoff, and Wrangler's
-   real local `/api/news` returned HTTP 200 with the empty edition. The isolated
-   Miniflare fixture test returned HTTP 500 without diagnostic details when calling
-   a Durable Object from Node. Diagnose that harness/runtime failure; do not claim
-   its fixture ingestion passed. Keep fictional fixture data out of the live site.
-1. Verify the existing Cloudflare Workers Builds deployment for this repository.
-   Build: `npm run check && npm test`; deploy: `npm run deploy`. If its configured
-   Worker name differs, reconcile `wrangler.jsonc` with that existing Worker.
-   Preserve its routes/domain and deployment connection. Do not create a parallel
-   deployment. Inspect only with available authorized Cloudflare access; report
-   unavailable access in `STATUS.md`, and continue independent work.
-2. Validate every enabled adapter in root `websites.json` against real publisher
-   RSS/news-sitemap responses from the runner. Initial domains must stay ynet.co.il,
-   kan.org.il, n12.co.il, mako.co.il. Record endpoint verification and dates in
-   `STATUS.md`. Repair changed feeds or article metadata parsers with observed
-   evidence. The environment used to bootstrap this project could not reach those
-   domains, so the initial endpoints need end-to-end verification from Actions.
-   Mako/N12 feed URLs were checked against Mako's official RSS directory; Kan's
-   news sitemap against its robots.txt. Ynet feed URLs need live verification.
-3. Run the deployed `/api/status` and `/api/news` smoke checks when its verified
-   URL is available. Check hourly freshness, coverage from all four sources,
-   category preservation, duplicate stories, and rewrite failures. Never publish
-   invented sample news or dates as live data.
-   Validate Workers AI Hebrew headline quality using the configured inexpensive
-   model and the factual guards. Verify the native AI binding and JSON response
-   shape. Prefer honest originals when output is unreliable; do not silently move
-   to expensive models or increase the budget to improve acceptance.
-4. Verify the Hebrew interface at desktop/mobile widths, RTL, keyboard navigation,
-   category/source filters, ordering, pagination, originals, and empty/error states.
-   Browser QA requires supported browser tooling; report its absence accurately.
-5. Strengthen factual headline validation and regression coverage for observed
-   errors. Check dry Hebrew phrasing against publisher facts and uncertainty.
-   Once working, make one useful bounded improvement or verification per run.
-   If no work is needed, finish the iteration without cosmetic commits.
+0. Address the urgent factual reversal, complete accessible article grounding,
+   Qwen3/Clef Flash evaluation and adaptive larger-batch daily-budget controls
+   described above. Add the exact success-to-failure regression before considering
+   the rewriting pipeline trustworthy. Preserve existing functionality.
+1. Verification evidence from Shurik iteration 1 (2026-10-13): the native journal
+   contains successful `npm run test:worker` output, 21 passing unit tests, and a
+   real workerd refresh with ynet=ok(114), kan=ok(8), n12=ok(74), mako=ok(58).
+   The local fixture HTTP 500 was fixed; Ynet category labels were corrected and
+   its misleading home-page feed was removed. Do not re-investigate those completed
+   bootstrap defects without a regression. Re-run relevant checks for new changes.
+2. Preserve the validated four-publisher adapters and exact source categories.
+   Kan's checked JSON-LD has no articleSection, so its missing categories remain
+   missing. Full-text extraction must be tested on real accessible articles from
+   these publishers; record context completeness and source failures honestly.
+3. Verify the existing Cloudflare Workers Builds deployment if authorized account
+   access or a verified live URL becomes available. Build: `npm run check && npm
+   test`; deploy: `npm run deploy`. Reconcile the existing Worker name/routes;
+   do not create another deployment. Account access and live deployment remain
+   unverified; an unchanged access blocker should not stall independent grounding
+   and factual-validation work or create repeated requests for the same input.
+4. Native Workers AI inference and actual Hebrew quality/neuron consumption
+   remain unverified. The local AI probe only demonstrated provider-unavailable
+   fallback. Measure them when authorized access is available; never interpret a
+   passing fixture/mock test as successful production inference or semantic fidelity.
+5. Desktop/mobile fixture render checks passed at 390x844 and 1440x1000.
+   Interactive QA (keyboard, category/source filters, order, pagination and error
+   states) remains pending. Use the existing browser harness when appropriate.
+   Once the urgent defects are fixed, keep iterations bounded and avoid cosmetic
+   changes or feature additions without concrete need.
 
 ## Editorial invariants
 
