@@ -15,7 +15,8 @@
     "test:retirement": "node scripts/retirement-check.js",
     "test:pipeline": "node scripts/pipeline-check.js",
     "test:batch": "node scripts/batch-check.js",
-    "test:browser": "node scripts/browser-check.js"
+    "test:browser": "node scripts/browser-check.js",
+    "test:interaction": "node scripts/interaction-check.js"
   },
   "dependencies": { "fast-xml-parser": "5.11.2" },
   "devDependencies": { "wrangler": "4.150.0", "miniflare": "5.20261006.2-beta" }

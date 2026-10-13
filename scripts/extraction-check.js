@@ -17,7 +17,8 @@ const mf = new Miniflare(convertV4MiniflareOptions({
 
 try {
   await mf.ready;
-  const data = await (await mf.dispatchFetch('https://probe.local/')).json();
+  // A self-closing SVG <path> in this page must not abort extraction (real pages have them).
+  const data = await (await mf.dispatchFetch('https://probe.local/?case=article')).json();
   assert.equal(data.headline, 'התעשייה האווירית השלימה בהצלחה ניסוי במל״ט');
   assert.deepEqual(data.categories, ['בטחון']);
   assert.equal(data.completeness, 'complete');
@@ -26,5 +27,11 @@ try {
   for (const noise of ['דף הבית', 'ספורט', 'פרסומת', 'כתבות נוספות', 'מומלץ עבורך', 'כל הזכויות שמורות']) {
     assert.ok(!data.body.includes(noise), `noise leaked into context: ${noise}`);
   }
-  console.log('Extraction passed: article body kept, navigation/advertising/related/footer removed, JSON-LD metadata read.');
+  const block = await (await mf.dispatchFetch('https://probe.local/?case=block')).json();
+  assert.equal(block.completeness, 'missing');
+  assert.equal(block.body, '');
+  const thin = await (await mf.dispatchFetch('https://probe.local/?case=thin')).json();
+  assert.equal(thin.completeness, 'missing');
+  assert.equal(thin.body, '');
+  console.log('Extraction passed: article body kept (self-closing SVG tolerated), navigation/advertising/related/footer removed, JSON-LD metadata read, bot-block and thin shells rejected.');
 } finally { await mf.dispose(); await rm(directory, { recursive: true, force: true }); }

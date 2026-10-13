@@ -19,8 +19,8 @@ const page = (headline, body) => `<!doctype html><html lang="he"><head>
 
 const fixture = async (request) => {
   const url = new URL(request.url);
-  if (url.pathname === '/news/article/1') return new Response(page('לפי המועצה: 3 תוכניות אושרו', 'המועצה אישרה 3 תוכניות חדשות.'), { headers: { 'content-type': 'text/html' } });
-  if (url.pathname === '/news/article/2') return new Response(page('האוכלוסייה בישראל רואה את הצפון כצימר לסופ״ש אבל לא כמקום לגור בו', 'ראש עיריית כרמיאל וראש עיריית דימונה אמרו כי הצפון נתפס כצימר לסופ״ש ולא כמקום לגור בו.'), { headers: { 'content-type': 'text/html' } });
+  if (url.pathname === '/news/article/1') return new Response(page('לפי המועצה: 3 תוכניות אושרו', 'המועצה המקומית אישרה שלוש תוכניות חדשות לפיתוח האזור. התוכניות כוללות הרחבת מבני הציבור, שיפור הכבישים ופיתוח שטחים פתוחים. האישור ניתן לאחר דיון ציבורי שבו עלו גם התנגדויות.'), { headers: { 'content-type': 'text/html' } });
+  if (url.pathname === '/news/article/2') return new Response(page('האוכלוסייה בישראל רואה את הצפון כצימר לסופ״ש אבל לא כמקום לגור בו', 'ראש עיריית כרמיאל וראש עיריית דימונה אמרו בכנס כי הצפון נתפס כצימר לסופ״ש ולא כמקום לגור בו. לדבריהם, המבקרים מגיעים לחופשה קצרה אך אינם רואים באזור בית. ראשי הערים בפריפריה קראו לחזק את האזורים האלה.'), { headers: { 'content-type': 'text/html' } });
   const item = (title, id) => `<item><title>${title}</title><link>https://www.ynet.co.il/news/article/${id}</link><pubDate>${rfc}</pubDate><category>בארץ</category><description>תיאור</description></item>`;
   return new Response(`<rss version="2.0"><channel><title>חדשות</title>${item('לפי המועצה: 3 תוכניות אושרו', 1)}${item('האוכלוסייה בישראל רואה את הצפון כצימר לסופ״ש אבל לא כמקום לגור בו', 2)}</channel></rss>`);
 };

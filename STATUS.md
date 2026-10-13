@@ -7,7 +7,19 @@
 - Sessions/control are on `shurik-control/main`; iterations continue immediately
   (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
-## Verified this iteration (2026-10-13, iteration 2-4)
+## Verified (2026-10-13, iteration 2-5)
+
+8. **Interactive/keyboard QA.** New `scripts/interaction-check.js`
+   (`npm run test:interaction`) drives the local build in headless Chromium over the
+   DevTools Protocol against a dedicated fictional fixture (100 articles). It sends
+   real `Tab` key events and proves every primary control is keyboard-reachable
+   (skip link, brand, about link, search, source/category selects, filter submit,
+   both order buttons, load-more, an article link), then exercises the source and
+   category filters, the chronological toggle (descending `dateTime`), explicit
+   load-more pagination without duplicate rows, and the rendered error/retry state
+   when `/api/news` is blocked. Passes locally; README documents the command.
+
+## Verified (2026-10-13, iteration 2-4)
 
 6. **Shared batch sizing fix.** `planBatches` previously sized requests by the
    rewrite model's context window only, so the same full article contexts were then
@@ -79,10 +91,11 @@ splitting) and `npm run test:browser` all pass.
    Clef Flash behaviour and real neuron use remain unmeasured. Mocks/fixtures prove
    wiring and fallbacks only. Switch the default to Qwen3 only after measured live
    checks. Do not interpret a passing fixture as successful production inference.
-3. **Interactive QA pending** (keyboard traversal and rendered error states). The
-   API contracts behind the filters, order and pagination are now covered by
-   `npm run test:worker`; keyboard traversal still needs a scripted browser pass.
-   Render checks at 390×844 and 1440×1000 passed previously.
+3. **Interactive QA.** Keyboard traversal, filter/order/pagination interaction and
+   the rendered error/retry state are now covered by `npm run test:interaction`
+   (see iteration 2-5). Render checks at 390×844 and 1440×1000 passed previously.
+   CI (`ci.yml`) still runs only `npm run check && npm test && npm run build`; adding
+   the workerd/browser checks to CI is a workflow change for the maintainer.
 4. Kan JSON-LD has no `articleSection`, so Kan categories remain missing by policy.
 
 Steering goes through `PROMPT.md`; further implementation belongs to Shurik.

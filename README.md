@@ -25,6 +25,7 @@ npm test
 npm run build
 npm run test:worker   # Miniflare runtime check with fictional fixtures (build first)
 npm run test:browser  # headless Chromium render check (build first, needs Chromium on PATH)
+npm run test:interaction  # keyboard/interaction QA in headless Chromium (build first)
 ```
 
 `build` bundles the Worker with Wrangler's dry run; it does not publish. Live
@@ -33,8 +34,10 @@ bounded background refresh; reload after it finishes. Wrangler local development
 needs outbound access to the publisher hosts for live aggregation. Additional
 workerd checks: `npm run test:worker` (fixtures), `npm run test:extract`
 (full-text extraction), `npm run test:retirement` (stale-cache retirement),
-`npm run test:pipeline` (mock-model end-to-end) and `npm run test:batch`
-(validator-window batch splitting).
+`npm run test:pipeline` (mock-model end-to-end), `npm run test:batch`
+(validator-window batch splitting) and `npm run test:interaction` (keyboard Tab
+traversal, source/category filters, chronological toggle, load-more pagination
+and the rendered error/retry state).
 
 ## Cloudflare deployment
 

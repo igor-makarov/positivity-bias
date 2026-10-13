@@ -3,7 +3,7 @@
 // pipeline (or an older grounding/verification policy) can never be displayed.
 
 export const EDITORIAL_VERSION = 'editorial-v3';
-export const CONTEXT_POLICY = 'full-text-v1';
+export const CONTEXT_POLICY = 'full-text-v2';
 export const VALIDATOR_VERSION = 'clef-guard-v1';
 
 export const DEFAULT_REWRITE_MODEL = '@cf/meta/llama-3.1-8b-instruct-fp8-fast';
