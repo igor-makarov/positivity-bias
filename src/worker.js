@@ -225,7 +225,7 @@ export default {
       const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(120, Math.floor(requestedLimit))) : 60;
       const offset = Math.max(0, Math.min(480, Number.parseInt(url.searchParams.get('offset') || '0', 10) || 0));
       return json({ ...publicStatus, categories: [...new Set(articles.flatMap((article) => article.categories))].sort((a, b) => a.localeCompare(b, 'he')),
-        total: selected.length, articles: selected.slice(offset, offset + limit).map(({ description, rewriteFingerprint, rewriteSource, rewriteStatus, ...article }) => ({
+        total: selected.length, articles: selected.slice(offset, offset + limit).map(({ description, rewriteFingerprint, rewriteSource, rewriteStatus, context, contextCompleteness, verification, ...article }) => ({
           ...article, rewriteStatus: rewriteStatus === 'rewritten' ? 'rewritten' : 'original' })) });
     } catch { return json({ error: 'temporarily_unavailable' }, 503); }
   },

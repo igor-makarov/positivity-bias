@@ -1,5 +1,5 @@
 import { plainText } from './text.js';
-import { estimateNeurons } from './budget.js';
+import { OUTPUT_TOKENS_PER_ITEM, estimateNeurons } from './budget.js';
 import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, CHEAP_MODELS } from './policy.js';
 
 export { DEFAULT_REWRITE_MODEL } from './policy.js';
@@ -155,7 +155,7 @@ export async function rewriteBatch(items, env, { model = env.REWRITE_MODEL || DE
   }));
   const user = JSON.stringify(requestItems);
   let payload, usage;
-  try { ({ payload, usage } = await runModel(env, model, EDITORIAL_PROMPT, user, maxTokens ?? 90 + items.length * 120)); }
+  try { ({ payload, usage } = await runModel(env, model, EDITORIAL_PROMPT, user, maxTokens ?? OUTPUT_TOKENS_PER_ITEM * items.length + 32)); }
   catch { return { candidates: [], status: 'provider_unavailable', usage: null }; }
   const document = parseJsonObject(payload);
   if (!Array.isArray(document?.items)) return { candidates: [], status: 'invalid_response', usage };
@@ -183,7 +183,7 @@ export async function verifyBatch(candidates, env, { model = env.VALIDATOR_MODEL
   }));
   const user = JSON.stringify(requestItems);
   let payload, usage;
-  try { ({ payload, usage } = await runModel(env, model, VERIFICATION_PROMPT, user, maxTokens ?? 60 + candidates.length * 120)); }
+  try { ({ payload, usage } = await runModel(env, model, VERIFICATION_PROMPT, user, maxTokens ?? OUTPUT_TOKENS_PER_ITEM * candidates.length + 32)); }
   catch { return { accepted: new Map(), status: 'provider_unavailable', usage: null }; }
   const document = parseJsonObject(payload);
   if (!Array.isArray(document?.items)) return { accepted: new Map(), status: 'invalid_response', usage };
