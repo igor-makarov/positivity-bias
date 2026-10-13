@@ -55,5 +55,8 @@
       "iteration": 2
     }
   ],
-  "lastRunId": "38403235636"
+  "lastRunId": "38403235636",
+  "failureTrail": [
+    "38419826476-1"
+  ]
 }
