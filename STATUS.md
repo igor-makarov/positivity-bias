@@ -22,6 +22,11 @@
     `noul`/`choice`/`score`, 1–64, with `criteria` valid for `noul`; `answers[id].noul` is
     the probability the answer is yes) — the verifier already matches it. New unit
     regression fails against the old `0.5` boundary and passes after the fix.
+    Live re-check (2-10): two live ynet article pages exposed JSON-LD `articleBody`
+    (1,925 and 2,826 chars) with no bot-block interstitial, so full-text grounding
+    still works on real accessible articles; ynet categories come from its RSS labels.
+    `articleSection` was absent on those pages, matching the policy that missing
+    publisher categories stay missing.
 
 ## Verified (2026-10-13, iteration 2-9)
 
