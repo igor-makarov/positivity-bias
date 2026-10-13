@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { acceptRewrite, DEFAULT_REWRITE_MODEL, EDITORIAL_PROMPT, VERIFICATION_PROMPT, parseJsonObject, parseModelText, rewriteBatch, verifyBatch } from '../src/rewrite.js';
+import { acceptRewrite, DEFAULT_REWRITE_MODEL, EDITORIAL_PROMPT, VERIFICATION_PROMPT, modelUsageNeurons, parseJsonObject, parseModelText, rewriteBatch, verifyBatch } from '../src/rewrite.js';
 import { DEFAULT_VALIDATOR_MODEL } from '../src/policy.js';
 import { OUTPUT_TOKENS_PER_ITEM } from '../src/budget.js';
 
@@ -177,6 +177,25 @@ test('Model responses are parsed across documented envelope shapes', () => {
   assert.deepEqual(parseJsonObject('```json\n{"items":[]}\n```'), { items: [] });
   assert.deepEqual(parseJsonObject('sure: {"items":[{"id":"1"}]} thanks'), { items: [{ id: '1' }] });
   assert.equal(parseJsonObject('no json here'), null);
+});
+test('Qwen3 chat envelopes resolve under top-level, result and response wrappers', () => {
+  const content = JSON.stringify({ items: [{ id: 'story-1', headline: 'לפי המשטרה, 3 בני אדם נפצעו באירוע', usable: true }] });
+  assert.equal(parseModelText({ choices: [{ message: { content, reasoning_content: 'מחשבה' } }] }), content);
+  assert.equal(parseModelText({ choices: [{ text: content }] }), content);
+  assert.equal(parseModelText({ result: { choices: [{ message: { content } }] } }), content);
+  assert.equal(parseModelText({ response: { choices: [{ message: { content } }] } }), content);
+  // A thinking-only answer with no content must not be mistaken for the JSON result.
+  assert.equal(parseModelText({ choices: [{ message: { content: '', reasoning_content: 'סיבה' } }] }), '');
+  assert.ok(modelUsageNeurons({ result: { usage: { prompt_tokens: 1000, completion_tokens: 100 } } }, '@cf/qwen/qwen3-30b-a3b-fp8') > 0);
+});
+test('A nested Qwen3 chat response is accepted through the rewrite batch', async () => {
+  const env = { AI: { run: async (model) => {
+    assert.equal(model, '@cf/qwen/qwen3-30b-a3b-fp8');
+    return { result: { choices: [{ message: { content: JSON.stringify({ items: [result('לפי המשטרה, 3 בני אדם נפצעו באירוע')] }) } }] } };
+  } } };
+  const { candidates } = await rewriteBatch([base], env, { model: '@cf/qwen/qwen3-30b-a3b-fp8' });
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].headline, 'לפי המשטרה, 3 בני אדם נפצעו באירוע');
 });
 test('Prompts require the primary point and material context, and separate verification questions', () => {
   assert.match(EDITORIAL_PROMPT, /material context/);

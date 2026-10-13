@@ -32,23 +32,32 @@ try {
     headline: 'תעשייה אווירית: ניסוי במל״ט עם מקלע נכשל', rewriteStatus: 'rewritten',
     rewriteFingerprint: legacyFingerprint, verification: { supported: true }, context: 'x'.repeat(4000),
     categories: ['חדשות'], publishedAt: now, description: 'תיאור' };
-  const seeded = { articles: [article], updatedAt: now, lastAttemptAt: now,
+  // A partial/legacy snapshot can lose the decision marker entirely while still
+  // holding a wrong generated headline. With no fingerprint it must not be served.
+  const orphan = { id: 'orphan-2', url: 'https://www.ynet.co.il/news/article/2', sourceId: 'ynet', sourceName: 'ynet',
+    originalHeadline: 'המועצה אישרה 7 תוכניות חדשות',
+    headline: 'המועצה דחתה 7 תוכניות חדשות',
+    categories: ['חדשות'], publishedAt: new Date(Date.now() - 60_000).toISOString(), description: 'תיאור' };
+  const seeded = { articles: [article, orphan], updatedAt: now, lastAttemptAt: now,
     rewriteStatus: 'ok', sources: [] };
   assert.equal(seeded.policyFingerprint, undefined); // the old snapshot had no policy fingerprint
   const seed = await store.fetch('https://news.internal/seed', { method: 'POST', body: JSON.stringify(seeded) });
   assert.equal(seed.status, 200);
 
   const api = await (await mf.dispatchFetch('https://fixture.local/api/news')).json();
-  assert.equal(api.articles[0].headline, article.originalHeadline);
-  assert.equal(api.articles[0].rewriteStatus, 'original');
-  assert.equal(api.articles[0].rewriteFingerprint, undefined);
-  assert.equal(api.articles[0].id, article.id);
-  assert.deepEqual(api.articles[0].categories, ['חדשות']);
+  const byId = new Map(api.articles.map((entry) => [entry.id, entry]));
+  const served = byId.get(article.id);
+  assert.equal(served.headline, article.originalHeadline);
+  assert.equal(served.rewriteStatus, 'original');
+  assert.equal(served.rewriteFingerprint, undefined);
+  assert.deepEqual(served.categories, ['חדשות']);
+  const orphanServed = byId.get(orphan.id);
+  assert.equal(orphanServed.headline, orphan.originalHeadline); // no fingerprint: never served
+  assert.equal(orphanServed.rewriteStatus, 'original');
 
-  // The idempotent migration persisted: a later read still shows the original.
+  // The idempotent migration persisted: a later read still shows the originals.
   const again = await (await store.fetch('https://news.internal/snapshot')).json();
-  assert.equal(again.articles[0].headline, article.originalHeadline);
-  assert.equal(again.articles[0].rewriteFingerprint, undefined);
+  for (const entry of again.articles) assert.equal(entry.headline, entry.originalHeadline);
   assert.ok(again.policyFingerprint);
   assert.notEqual(again.policyFingerprint, legacyFingerprint);
   console.log('Retirement passed: a stale cached headline is never served and the migration persists without inference.');

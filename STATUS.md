@@ -7,6 +7,25 @@
 - Sessions/control are on `shurik-control/main`; iterations continue immediately
   (`wait-seconds: 0`), with a separate hourly Codex checkup.
 
+## Verified (2026-10-13, iteration 2-7)
+
+14. **Missing-fingerprint retirement defect fixed.** `retireStaleRewrites` treated an
+    article as having a decision only when `rewriteStatus` was `rewritten`/`rejected`
+    or a fingerprint existed. A legacy/partial snapshot that lost both but still held
+    a wrong generated `headline` was therefore served as a generated headline,
+    violating "missing fingerprints must never expose an untrusted cached rewrite."
+    Now any stored headline that differs from the preserved original is treated as an
+    untrusted rewrite and retired to the original. New unit regression fails on the
+    pre-fix logic and passes after it; `npm run test:retirement` seeds such an orphan
+    article (no status, no fingerprint) into the real Worker and confirms it is never
+    served and the migration persists.
+15. **Qwen3 response-shape handling hardened.** `parseModelText` now resolves chat
+    `choices` under top-level, `result` and `response` wrappers; `modelUsageNeurons`
+    also reads nested `result.usage`; a thinking-only `reasoning_content` with empty
+    `content` is not mistaken for the JSON result. New unit and batch regressions
+    cover the nested Qwen3 envelope. Default model remains Llama pending the live
+    Hebrew/neuron measurement described under Blocked.
+
 ## Verified (2026-10-13, iteration 2-6)
 
 11. **Runtime checks now exercise current source.** `test:worker`, `test:browser` and
@@ -117,13 +136,12 @@
    on both the rewrite and verification paths, and stale-cache retirement are all
    covered.
 
-Latest full validation (iteration 2-6): `npm run check`, **46 unit tests**,
+Latest full validation (iteration 2-7): `npm run check`, **49 unit tests**,
 `npm run build`, `npm run test:worker`, `npm run test:extract`, `npm run test:retirement`,
 `npm run test:pipeline` (mock model end-to-end + retire/reprocess), `npm run test:batch`
 (validator-window splitting), `npm run test:browser` and `npm run test:interaction` all
-pass. The bundle-freshness guard was exercised: a direct `node scripts/smoke.js` after
-touching `src/worker.js` exited 2 with the stale-bundle message, then passed after a
-rebuild. (Iteration 2-5 ran the full battery twice.)
+pass. The missing-fingerprint retirement regression was shown to fail against the
+pre-fix logic and pass after the fix. (Iteration 2-5 ran the full battery twice.)
 
 ## Blocked / needs input
 

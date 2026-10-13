@@ -62,3 +62,25 @@ test('Source fingerprints are stable and content-sensitive', () => {
   assert.equal(sourceFingerprint(stale), sourceFingerprint({ ...stale }));
   assert.notEqual(sourceFingerprint(stale), sourceFingerprint({ ...stale, originalHeadline: 'אחר' }));
 });
+
+test('A generated headline with no status or fingerprint is still retired as untrusted', () => {
+  // Legacy/partial snapshots can lose the decision marker while keeping a wrong
+  // generated headline. A stored headline that differs from the original must never
+  // be served without a current fingerprint, even with no status to key on.
+  const legacy = { id: 'legacy-1', url: 'https://www.ynet.co.il/news/article/9', sourceId: 'ynet', sourceName: 'ynet',
+    originalHeadline: stale.originalHeadline, headline: 'תעשייה אווירית: ניסוי במל״ט עם מקלע נכשל',
+    description: 'תיאור', categories: ['חדשות'], publishedAt: '2026-10-13T11:00:00Z' };
+  const { articles, changed } = retireStaleRewrites([legacy], fingerprint);
+  assert.equal(changed, true);
+  assert.equal(articles[0].headline, legacy.originalHeadline);
+  assert.equal(articles[0].rewriteStatus, 'original');
+  assert.equal(articles[0].id, legacy.id);
+  assert.deepEqual(articles[0].categories, ['חדשות']);
+  // A genuine original (headline equals the preserved original) is left untouched.
+  const plain = { ...legacy, headline: legacy.originalHeadline, rewriteStatus: 'original' };
+  assert.equal(retireStaleRewrites([plain], fingerprint).changed, false);
+  // A current-policy rewrite is still trusted.
+  const current = { ...legacy, rewriteStatus: 'rewritten', rewriteFingerprint: fingerprint };
+  assert.equal(retireStaleRewrites([current], fingerprint).changed, false);
+  assert.equal(retireStaleRewrites([current], fingerprint).articles[0].headline, legacy.headline);
+});

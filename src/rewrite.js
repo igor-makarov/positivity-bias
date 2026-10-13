@@ -104,8 +104,11 @@ export function parseModelText(payload) {
   if (typeof payload.result === 'string') return payload.result;
   if (typeof payload.result?.response === 'string') return payload.result.response;
   if (typeof payload.output_text === 'string') return payload.output_text;
-  const content = payload.choices?.[0]?.message?.content ?? payload.choices?.[0]?.text;
-  if (typeof content === 'string') return content;
+  // Chat-style models (e.g. Qwen3) answer under `choices`; some Workers AI
+  // envelopes nest that under `result`/`response`, so resolve all documented shapes.
+  const choices = payload.choices ?? payload.result?.choices ?? payload.response?.choices;
+  const content = choices?.[0]?.message?.content ?? choices?.[0]?.text;
+  if (typeof content === 'string' && content) return content;
   if (payload.response && typeof payload.response === 'object') return JSON.stringify(payload.response);
   if (payload.result && typeof payload.result === 'object') return JSON.stringify(payload.result);
   return '';
@@ -121,7 +124,7 @@ export function parseJsonObject(value) {
 }
 
 export function modelUsageNeurons(payload, model) {
-  const usage = payload?.usage;
+  const usage = payload?.usage ?? payload?.result?.usage;
   if (!usage) return null;
   const input = Number(usage.prompt_tokens ?? usage.input_tokens);
   const output = Number(usage.completion_tokens ?? usage.output_tokens);
