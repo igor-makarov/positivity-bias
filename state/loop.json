@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "main",
+  "branch": "main",
+  "defaultBranch": "main",
+  "supervisor": "a637cd4b71137ca58960dda0bbb0dd487064810d",
+  "status": "running",
+  "generation": 1,
+  "next": 1,
+  "model": "deepseek-v4.1-flash",
+  "reasoning": "high",
+  "source": "9376c22f0d7d956b36eb4f617db8dcd259ad703f",
+  "sourceRef": null,
+  "provider": "opencode-go"
+}
