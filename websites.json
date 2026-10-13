@@ -6,10 +6,9 @@
       "allowedHosts": ["ynet.co.il", "www.ynet.co.il"],
       "feeds": [
         { "url": "https://www.ynet.co.il/Integration/StoryRss2.xml", "category": "חדשות" },
-        { "url": "https://www.ynet.co.il/Integration/StoryRss3.xml", "category": "כלכלה" },
-        { "url": "https://www.ynet.co.il/Integration/StoryRss6.xml", "category": "ספורט" },
-        { "url": "https://www.ynet.co.il/Integration/StoryRss538.xml", "category": "תרבות" },
-        { "url": "https://www.ynet.co.il/Integration/StoryRss8.xml", "category": "בריאות" }
+        { "url": "https://www.ynet.co.il/Integration/StoryRss3.xml", "category": "ספורט" },
+        { "url": "https://www.ynet.co.il/Integration/StoryRss6.xml", "category": "כלכלה" },
+        { "url": "https://www.ynet.co.il/Integration/StoryRss538.xml", "category": "תרבות ובידור" }
       ]
     },
     {
