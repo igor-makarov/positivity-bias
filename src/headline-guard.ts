@@ -7,6 +7,8 @@ export function materialHeadlineSafe(original: string, headline: string) {
   const source = String(original || '');
   const result = String(headline || '');
   if (HYPE.test(result)) return false;
+  if (/ממונ(?:י|ים|ות).*בטיחות/u.test(source) && !/בטיחות/u.test(result)) return false;
+  if (/להשפיע על הבחירות/u.test(source) && !/בחירות/u.test(result)) return false;
   const words = result.replace(/["'״׳]/g, '').match(/[\u05d0-\u05ea]+/gu) || [];
   for (const match of source.matchAll(/([\u05d0-\u05ea]{2,10})["״']([\u05d0-\u05ea]+)/gu)) {
     const prefixes = new Set([match[1]]);

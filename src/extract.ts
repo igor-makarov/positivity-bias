@@ -1,7 +1,7 @@
 import type { Context, ContextOptions } from './types.ts';
 import { articleMetadata, plainText } from './text.ts';
 
-export const DEFAULT_CONTEXT_CHARS = 6_000;
+export const DEFAULT_CONTEXT_CHARS = 18_000;
 // A body shorter than this is navigation chrome or a stub, not an article. Such
 // context is treated as missing so the original headline is preserved instead of
 // grounding a rewrite in a menu fragment.

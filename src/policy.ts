@@ -2,16 +2,17 @@ import type { Article, PolicyEnv } from './types.ts';
 // Central editorial/AI policy. The fingerprint below is written onto every accepted
 // rewrite and checked again at read/serve time, so a rewrite produced by an older
 // pipeline (or an older grounding/verification policy) can never be displayed.
+import { meaningfulRewrite } from './headline-change.ts';
 import { materialHeadlineSafe } from './headline-guard.ts';
 
-export const EDITORIAL_VERSION = 'editorial-options-v4';
-export const REWRITE_CONTRACT_VERSION = 'structured-options-v8';
+export const EDITORIAL_VERSION = 'editorial-options-v5';
+export const REWRITE_CONTRACT_VERSION = 'structured-options-v9';
 // v2: bounded HTMLRewriter body extraction with navigation/advertising/related removed.
 // v3: a noise-named layout wrapper (e.g. Bootstrap's "row navigation") wrapping the
 // whole page no longer suppresses <main>; live Kan article pages now yield a complete
 // body instead of a 42-char navigation shell. Any rewrite grounded on the older
 // extraction is retired by the existing fingerprint path and reprocessed progressively.
-export const CONTEXT_POLICY = 'full-text-v3';
+export const CONTEXT_POLICY = 'full-text-v4';
 // v2: clef-flash is driven through its documented decision schema (state + typed
 // yes/no questions), not the chat completion shape that its API does not accept.
 // v3: a candidate is accepted only on a confident yes; a weakly-positive or uncertain
@@ -19,7 +20,7 @@ export const CONTEXT_POLICY = 'full-text-v3';
 // maximally uncertain 0.5 verdict).
 // v4: three alternatives, one native choice with an original fallback; malformed
 // or uncertain choices are never cached as source-grounded rejections.
-export const VALIDATOR_VERSION = 'clef-options-guard-v5';
+export const VALIDATOR_VERSION = 'clef-options-language-v6';
 
 // First-choice low-cost rewrite model. `@cf/qwen/qwen3-30b-a3b-fp8` documents Hebrew
 // support, has a 32,768-token window and is cheaper on output tokens than the previous
@@ -140,6 +141,7 @@ export function retireStaleRewrites<T extends Decision>(articles: T[], fingerpri
       || article.rewriteFingerprint != null || generated;
     if (!hasDecision) return article;
     if (usable && article.rewriteFingerprint === fingerprint && article.rewriteStatus === 'rewritten'
+      && meaningfulRewrite(article.originalHeadline, article.headline || "")
       && materialHeadlineSafe(article.originalHeadline, article.headline || "")) return article;
     // A cached rejection is a decision to display the PRESERVED original headline. Trust
     // it only when it actually carries that original: a partial/corrupted snapshot could

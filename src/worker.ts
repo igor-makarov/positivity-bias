@@ -1,4 +1,4 @@
-import type { Article, Env, PolicyEnv, RefreshResult, Snapshot, SourceStatus } from './types.ts';
+import type { Article, Env, PolicyEnv, PublicStatus, RefreshResult, Snapshot, SourceStatus } from './types.ts';
 import configuration from '../websites.json';
 import { coverageOrder, mergeArticles, validateWebsites } from './news.ts';
 import { ingestSource, loadArticleContext } from './ingest.ts';
@@ -7,7 +7,7 @@ import { DEFAULT_REWRITE_MODEL, DEFAULT_VALIDATOR_MODEL, REWRITE_CONTRACT_VERSIO
 import { rewriteBatch, verifyBatch } from './rewrite.ts';
 import { budgetDecision, dailyNeuronBudget, estimateBatchNeurons, fitBatchToBudget, planBatches, requestContextTokens, SHARED_RESERVED_TOKENS_PER_ITEM } from './budget.ts';
 import { HOUR, refreshDue } from './refresh.ts';
-import { boundedPublisherFetch, mapConcurrently, pendingArticles, rewriteCoverage, newTitleCoverage } from './progress.ts';
+import { boundedPublisherFetch, mapConcurrently, pendingArticles, rewriteCoverage, newTitleCoverage, newArticles } from './progress.ts';
 
 const sources = validateWebsites(configuration);
 // A changed policy gets one immediate refresh. Persist
@@ -146,7 +146,7 @@ export class NewsStore {
     const pending = pendingArticles(snapshot.articles, policyFingerprint(this.env), now, 1, Date.parse(snapshot.lastAttemptAt || ""));
     const hasBudget = this.readUsage(this.usageDay(now)) < dailyNeuronBudget(this.env);
     const more = (continuation?.roundsLeft ?? 0) > 0 && pending.length && hasBudget && snapshot.rewriteStatus !== 'budget_deferred'
-      && !['provider_unavailable', 'validator_misconfigured', 'budget_guard'].includes(snapshot.rewriteStatus);
+      && !['provider_unavailable', 'validator_misconfigured', 'budget_guard', 'not_configured'].includes(snapshot.rewriteStatus);
     if (!more) delete snapshot.rewriteContinuation;
     this.writeSnapshot(snapshot);
     if (more) await this.state.storage.setAlarm(Date.now() + 1_000);
@@ -224,7 +224,7 @@ export class NewsStore {
     // The shared rewrite+verify request reserves a complete short rewrite result plus
     // the choice question and alternatives evaluated per article by the validator.
     const batches = planBatches(usable.map(({ article, context }) =>
-      ({ article, context: context.text, contextLength: context.text.length, completeness: context.completeness })),
+      ({ article, context: context.text, contextLength: context.text.length + (article.description?.length || 0), completeness: context.completeness })),
       { model, contextTokens: contextLimit, outputTokensPerItem: SHARED_RESERVED_TOKENS_PER_ITEM });
     if (!batches.length) { snapshot.rewriteStatus = 'context_unavailable'; return; }
     const day = this.usageDay(now);
@@ -241,7 +241,7 @@ export class NewsStore {
       const reservation = this.reserveUsage(day, estimate);
       if (!reservation.allowed) { deferred = true; break; }
       const items = sized.map(({ article, context, completeness }) => ({ id: article.id, sourceName: article.sourceName,
-        originalHeadline: article.originalHeadline, publishedAt: article.publishedAt,
+        originalHeadline: article.originalHeadline, description: article.description, publishedAt: article.publishedAt,
         context, contextCompleteness: completeness }));
       const rewrite = await rewriteBatch(items, aiEnv, { model });
       diagnostics.rewriteCalls++;
@@ -268,8 +268,11 @@ export class NewsStore {
       }
       const verified = rewrite.candidates.length
         ? await verifyBatch(rewrite.candidates, aiEnv, { model: validator })
-        : { accepted: new Map<string,string>(), rejected: new Set<string>(), evaluated: new Set<string>(), answered: new Set<string>(), answerShape: null, failureReason: null, usage: null, status: 'rejected' };
+        : { accepted: new Map<string,string>(), rejected: new Set<string>(), evaluated: new Set<string>(), answered: new Set<string>(), answerShape: null, failureReason: null, readabilityFailures: 0, originalConflicts: 0, missingVerdicts: 0, usage: null, status: 'rejected' };
       if (rewrite.candidates.length) diagnostics.validatorBatches++;
+      diagnostics.readabilityFailures = (diagnostics.readabilityFailures || 0) + (verified.readabilityFailures || 0);
+      diagnostics.originalConflicts = (diagnostics.originalConflicts || 0) + (verified.originalConflicts || 0);
+      diagnostics.missingVerdicts = (diagnostics.missingVerdicts || 0) + (verified.missingVerdicts || 0);
       diagnostics.verified += verified.evaluated?.size ?? 0;
       diagnostics.choiceAnswered += verified.answered?.size ?? 0;
       diagnostics.uncertainChoices += (verified.answered?.size ?? 0) - (verified.evaluated?.size ?? 0);
@@ -327,7 +330,7 @@ export default {
       const response = await env.NEWS.getByName('edition').fetch('https://news.internal/snapshot');
       const snapshot = await response.json<Snapshot>();
       const { articles = [], ...rest } = snapshot;
-      const publicStatus = { updatedAt: rest.updatedAt, lastAttemptAt: rest.lastAttemptAt,
+      const publicStatus: PublicStatus = { updatedAt: rest.updatedAt, lastAttemptAt: rest.lastAttemptAt,
         rewriteStatus: rest.rewriteStatus, sources: rest.sources, refreshing: rest.refreshing === true,
         rewriteCoverage: rest.rewriteCoverage, newTitleCoverage: rest.newTitleCoverage,
         stale: !rest.updatedAt || Date.now() - Date.parse(rest.updatedAt) > 2 * HOUR };
@@ -336,7 +339,9 @@ export default {
         rewriteDiagnostics: rest.rewriteDiagnostics ?? null, dailyNeurons: rest.dailyNeurons });
       const query = (url.searchParams.get('q') || '').trim().slice(0, 120).toLocaleLowerCase('he');
       const category = url.searchParams.get('category'), source = url.searchParams.get('source');
-      let selected = articles.filter((article) => (!category || (article.categories || []).includes(category))
+      const pool = url.searchParams.get('new') === '1'
+        ? newArticles(articles, rest.newTitlesSince || new Date().toISOString()) : articles;
+      let selected = pool.filter((article) => (!category || (article.categories || []).includes(category))
         && (!source || article.sourceId === source)
         && (!query || `${article.headline} ${article.originalHeadline} ${article.description}`.toLocaleLowerCase('he').includes(query)));
       selected = url.searchParams.get('order') === 'latest' ? [...selected].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)) : coverageOrder(selected);

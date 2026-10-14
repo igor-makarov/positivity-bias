@@ -34,6 +34,12 @@ try {
   const result = await mf.dispatchFetch('https://fixture.local/api/news');
   assert.equal(result.status, 200);
   const data = (await result.json() as FixtureResponse);
+  assert.equal(data.refreshing, false, 'no AI binding must not create idle continuation alarms');
+  const fresh = await (await mf.dispatchFetch('https://fixture.local/api/news?new=1&limit=120')).json() as FixtureResponse;
+  assert.equal(fresh.total, data.total);
+  assert.ok(fresh.newTitleCoverage);
+  assert.equal(fresh.newTitleCoverage.total, data.total);
+  assert.ok(fresh.articles.every(article => !('firstSeenAt' in article)));
   assert.equal(data.sources.length, 4);
   assert.ok(data.sources.every((source) => source.state === 'ok'));
   assert.deepEqual(new Set(data.articles.map((article) => article.sourceId)), new Set(['ynet', 'kan', 'n12', 'mako']));

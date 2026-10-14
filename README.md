@@ -89,29 +89,33 @@ native live inference has been measured, but model scores do not establish factu
 
 Each refresh fetches the **full accessible article text** for the candidates it can
 afford, strips navigation, advertising and unrelated recommendations, and passes the
-publisher, original headline, publication time and body (marked complete, truncated
+publisher, original headline, publisher summary, publication time and body (marked complete, truncated
 or missing) to the model. The editorial prompt requires the primary point and its
 material context — actor/speaker, action, geographic scope and result — and never
-reverses an outcome. Missing context keeps the original headline.
+reverses an outcome. The body window is 18,000 characters; longer inputs are explicitly
+marked truncated, and request planning respects both model windows. Missing context
+keeps the original headline; a publisher summary alone never authorizes a rewrite.
 
-The rewrite call proposes three distinct dry alternatives per article. The first
+The rewrite call requests one strong dry headline, with up to two additional
+alternatives only if they are equally complete and fluent. The first
 preserves the original factual clauses with minimal editing. Where possible, a
 conservative candidate removes standalone click prompts without removing facts;
 it competes in the same validation call, with no extra inference or weaker checks.
 New and corrected titles take priority over the retained backlog. `/api/status`
 reports `newTitleCoverage` for retained titles first seen or corrected since tracking
 started, within the past 24 hours. Blocked/rejected/pending titles remain in the
-denominator; unchanged copies never count as conversions. Its 90% target is a
-conversion target, not a measured guarantee of factual accuracy. In one native
-Clef Flash call, two independent `noul` checks per alternative assess factual support
-and preservation of the primary point and material context; a `choice` question ranks
-the alternatives and provides an explicit original fallback. Both checks must reach
+denominator; unchanged copies and punctuation/quote-only edits never count as conversions. Its 90% target is a
+conversion target, not a measured guarantee of factual accuracy. `/api/news?new=1`
+returns the same cohort for review without exposing bodies or internal attempt fields. In one native
+Clef Flash call, three independent `noul` checks per alternative assess factual support,
+preservation of the primary point/material context, and fluent, dry Hebrew; a `choice` question ranks
+the alternatives and provides an explicit original fallback. All three checks must reach
 0.7 for an alternative to qualify. The clearest qualifying alternative is selected;
 choice probabilities rank wording, rather than measuring factual validity. Native
 distribution confidence is diagnostic metadata and can differ from option probability.
 Missing, malformed or uncertain checks preserve originals and remain retryable at the
 next edition. A confident original selection with no qualifying alternatives is cached.
-Calls respect the 64-question and 24,576-token limits. Clef charges input tokens only.
+Calls respect the 64-question and 24,576-token limits (at most six articles with three alternatives). Clef charges input tokens only.
 
 Rewrite requests use a JSON schema with short, request-local article IDs; those IDs
 are restored to the original article identity before factual verification or storage.

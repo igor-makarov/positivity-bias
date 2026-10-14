@@ -10,7 +10,7 @@ import { OUTPUT_TOKENS_PER_ITEM } from '../src/budget.ts';
 const base = { id: 'story-1', sourceName: 'ynet', publishedAt: '2026-10-13T11:00:00Z',
   originalHeadline: 'לפי המשטרה: 3 בני אדם נפצעו באירוע',
   context: 'המשטרה מסרה כי הנסיבות נבדקות. לפי המשטרה, 3 בני אדם נפצעו באירוע.', contextCompleteness: 'complete' };
-const faithful = 'לפי המשטרה, 3 בני אדם נפצעו באירוע';
+const faithful = 'באירוע נפצעו 3 בני אדם לפי המשטרה';
 const alternatives = [faithful, 'לפי המשטרה נפצעו באירוע 3 בני אדם', '3 בני אדם נפצעו באירוע לפי המשטרה'];
 const output = (id = '0', headlines = alternatives, usable = true) => ({ id, headlines, usable });
 const responseEnv = (items: unknown[]) => ({ AI: { run: async () => ({ response: JSON.stringify({ items }) }) } });
@@ -70,7 +70,7 @@ test('Original is retained when no alternative preserves the primary point', asy
   assert.equal(result.accepted.size, 0); assert.ok(result.rejected.has(periphery.id));
 });
 
-test('Native request has three distinct alternatives, short ids, strict schema and full article context', async () => {
+test('Native request permits one to three alternatives, short ids, strict schema and full article context', async () => {
   const items = [base, { ...base, id: 'https://publisher.test/a-very-long-id' }];
   const env = { AI: { run: async (model: string, input: AIInput) => {
     assert.equal(model, DEFAULT_REWRITE_MODEL);
@@ -79,7 +79,7 @@ test('Native request has three distinct alternatives, short ids, strict schema a
     assert.deepEqual(sent.map(({ id }) => id), ['0', '1']); assert.equal(sent[0].article, base.context);
     const schema = (input.response_format as SchemaUnderTest).json_schema.properties.items;
     assert.equal(schema.minItems, 2); assert.deepEqual(schema.items.required, ['id', 'headlines', 'usable']);
-    assert.equal(schema.items.properties.headlines.minItems, 3);
+    assert.equal(schema.items.properties.headlines.minItems, 1);
     assert.equal(schema.items.properties.headlines.maxItems, 3);
     assert.deepEqual(schema.items.properties.id.enum, ['0', '1']);
     assert.match(messages(input)[0].content, /\/no_think/);
@@ -105,7 +105,7 @@ test('Independent selection of one article does not affect a rejected sibling', 
   assert.deepEqual([...result.accepted.keys()], [base.id]); assert.deepEqual([...result.rejected], ['other']);
 });
 test('Malformed, missing, duplicated, unknown and omitted identities remain retryable', async () => {
-  for (const items of [[], [output('unknown')], [output(), output()], [{ id: '0', headlines: [faithful], usable: true }], [{ id: '0', headline: faithful, usable: true }]]) {
+  for (const items of [[], [output('unknown')], [output(), output()], [{ id: '0', headlines: [], usable: true }], [{ id: '0', headline: faithful, usable: true }]]) {
     const result = await rewriteBatch([base], responseEnv(items));
     assert.equal(result.candidates.length, 0); assert.equal(result.evaluated.size, 0);
   }
@@ -158,7 +158,7 @@ test('A choice with no factual/material-context answers is not verification', as
   assert.equal(result.accepted.size, 0); assert.equal(result.answered.size, 0);
 });
 test('Uncertain factual checks are answered but undecided, without being cached as a rejection', async () => {
-  const checks = Object.fromEntries(alternatives.flatMap((_, i) => ['supported', 'preserved'].map((key) => [`0_option_${i + 1}_${key}`, { type: 'noul', noul: 0.5 }])));
+  const checks = Object.fromEntries(alternatives.flatMap((_, i) => ['supported', 'preserved', 'readable'].map((key) => [`0_option_${i + 1}_${key}`, { type: 'noul', noul: 0.5 }])));
   const result = await verifyBatch([candidate()], selectionEnv({ '0_headline': answer('option_1', 0.5) }, checks));
   assert.equal(result.answered.size, 1); assert.equal(result.evaluated.size, 0);
 });
@@ -170,7 +170,7 @@ test('Chat/noul answers cannot masquerade as native selections', async () => {
 });
 test('Unknown verification usage stays unknown for conservative ledger reconciliation', async () => {
   assert.equal((await verifyBatch([candidate()], selectionEnv({ '0_headline': answer() }))).usage, null);
-  const checks = Object.fromEntries(alternatives.flatMap((_, i) => ['supported', 'preserved'].map((key) => [`0_option_${i + 1}_${key}`, 1])));
+  const checks = Object.fromEntries(alternatives.flatMap((_, i) => ['supported', 'preserved', 'readable'].map((key) => [`0_option_${i + 1}_${key}`, 1])));
   const result = await verifyBatch([candidate()], { AI: { run: async () => ({ result: { answers: { ...checks, '0_headline': answer() }, usage: { input_tokens: 1000, output_tokens: 0 } } }) } });
   assert.ok(result.usage != null && result.usage > 0); assert.equal(result.accepted.size, 1);
 });
@@ -223,6 +223,42 @@ test('Truncated native responses report bounded diagnostics without provider con
   assert.equal(result.status, 'invalid_response'); assert.equal(result.finishReason, 'length'); assert.ok(!('payload' in result)); assert.ok(result.usage != null && result.usage > 0);
 });
 test('Both editor and selector require faithful material context and outcomes', () => {
-  assert.match(EDITORIAL_PROMPT, /THREE distinct/); assert.match(EDITORIAL_PROMPT, /never reverse an outcome/);
+  assert.match(EDITORIAL_PROMPT, /ONE strong/); assert.match(EDITORIAL_PROMPT, /never reverse an outcome/);
   assert.match(VERIFICATION_PROMPT, /fully supported/); assert.match(VERIFICATION_PROMPT, /material context/);
+});
+
+test('One complete candidate is valid; empty and excessive candidate lists are retryable', async () => {
+  assert.deepEqual((await rewriteBatch([base], responseEnv([output('0', [faithful])]))).candidates[0].headlines, [faithful]);
+  assert.equal((await rewriteBatch([base], responseEnv([output('0', [])]))).evaluated.size, 0);
+  assert.equal((await rewriteBatch([base], responseEnv([output('0', Array(4).fill(faithful))]))).evaluated.size, 0);
+});
+
+test('Factual support cannot override broken Hebrew, hype or a missing readability verdict', async () => {
+  for (const value of [0, 0.5, undefined]) {
+    let calls = 0;
+    const result = await verifyBatch([candidate(base, [faithful])], {AI:{run:async()=>{
+      calls++;
+      return {answers:{'0_headline':answer('option_1',1,['option_1','original']),
+        '0_option_1_supported':{noul:1},'0_option_1_preserved':{noul:1},
+        ...(value == null ? {} : {'0_option_1_readable':{noul:value}})}};
+    }}});
+    assert.equal(calls, 1);
+    assert.equal(result.accepted.size, 0);
+    assert.equal(result.evaluated.size, 0);
+  }
+});
+
+test('Publisher summaries accompany the full body in generation and validation', async () => {
+  const item = {...base,description:'לפי המשטרה, האירוע נחקר בידי היחידה המרכזית.'};
+  await rewriteBatch([item], {AI:{run:async(_model:string,input:AIInput)=>{
+    const sent=JSON.parse(messages(input)[1].content) as {publisherSummary:string;article:string}[];
+    assert.equal(sent[0].publisherSummary,item.description);
+    assert.equal(sent[0].article,item.context);
+    return {items:[output('0',[faithful])]};
+  }}});
+  await verifyBatch([candidate(item,[faithful])],{AI:{run:async(_model:string,input:AIInput)=>{
+    assert.equal(input.state![0].publisherSummary,item.description);
+    assert.equal(input.state![0].article,item.context);
+    return {answers:{}};
+  }}});
 });

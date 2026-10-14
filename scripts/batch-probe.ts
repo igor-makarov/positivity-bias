@@ -9,7 +9,7 @@ import { rewriteItems } from './fixtures.ts';
 const VALIDATOR = '@cf/cloudflare/clef-flash';
 
 function createMockAI(invalidFirst = false) {
-  const calls = { rewrite: 0, verify: 0, maxVerifyChars: 0, maxRewriteChars: 0 };
+  const calls = { rewrite: 0, verify: 0, maxVerifyChars: 0, maxRewriteChars: 0, failedItems: 0 };
   const run = async (model: string, input: AIInput) => {
     if (model === VALIDATOR) {
       calls.verify++;
@@ -26,8 +26,8 @@ function createMockAI(invalidFirst = false) {
       return { model: 'clef-flash', answers, usage: { input_tokens: 2000, output_tokens: 0 } };
     }
     calls.rewrite++;
-    if (invalidFirst && calls.rewrite === 1) return { response: 'not json' };
     const items = rewriteItems(input);
+    if (invalidFirst && calls.rewrite === 1) { calls.failedItems = items.length; return { response: 'not json' }; }
     calls.maxRewriteChars = Math.max(calls.maxRewriteChars, JSON.stringify(items).length);
     // A changed headline, so coverage cannot count unchanged echoes as conversions.
     return { response: JSON.stringify({ items: items.map((item) => ({ id: item.id, usable: true, headlines: [`דיווח מקומי: ${item.originalHeadline}`, `פורסם במקור: ${item.originalHeadline}`, `הפרסום המקומי: ${item.originalHeadline}`] })) }) };

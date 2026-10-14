@@ -7,6 +7,32 @@
 - Sessions/control are on `shurik-control/main`. The user stopped Shurik and the
   hourly Codex checkup on 2026-10-13; both remain stopped.
 
+## New-title quality follow-up (2026-10-14)
+
+- Native pre-change cohort: 35 new/corrected titles since tracking started, 17 converted
+  (48.6%), 3 bodies unavailable, 10 rejected and 5 pending; daily ledger 1,497/6,000.
+  Review found cosmetic-only conversions and loss of professional role qualifiers.
+- Contract v9: one strong fluent draft with up to two optional alternatives; publisher
+  summaries now accompany the actual body in both model calls. Default body window
+  expands to 18,000 characters under the same model-window and daily-budget guards.
+- A third native check validates readable, dry Hebrew in the same Clef call. All
+  support/material/readability checks require 0.7; original fallback still applies.
+  Batching and neuron reservations account for the added questions, capped at 64.
+- Cosmetic-only edits are rejected at generation, serve-time retirement and coverage
+  measurement. Safety-officer qualifiers and explicit electoral purpose are protected.
+  Updated fingerprints retire older decisions before any inference or cooldown.
+- Recent-cohort retries now precede older untouched baseline articles across editions.
+  `/api/news?new=1` supports review of the measured cohort; private fields stay stripped.
+  Diagnostic counts distinguish readability failures, missing verdicts and conflicts
+  where native original selection disagrees with qualified alternatives.
+- Strict TypeScript and 89 unit tests pass, along with Worker smoke, cache retirement,
+  pipeline, shared-window/budget/continuation and malformed-batch isolation checks.
+  A nine-body fixture now splits into nine requests, reserves 814 neurons, and a
+  100-neuron budget still processes a reduced prefix. Model fixtures do not establish
+  real factual accuracy; the production 90% target must be assessed after deployment.
+- Shurik and both Codex check-ins remain disabled. No budget increase, summary-only
+  inference, expensive model fallback or new monitoring is authorized by this follow-up.
+
 ## New-title rewrites, TypeScript and dark mode (2026-10-13)
 
 - All Worker, browser, test and verification-script sources are TypeScript, with

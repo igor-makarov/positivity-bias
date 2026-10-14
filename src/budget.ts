@@ -15,10 +15,10 @@ export const DEFAULT_DAILY_NEURON_BUDGET = 6_000;
 export const MAX_DAILY_NEURON_BUDGET = 10_000;
 export const ESTIMATED_CHARS_PER_TOKEN = 1.5; // deliberately conservative for Hebrew + JSON wrappers
 export const OUTPUT_TOKENS_PER_ITEM = 540; // three complete Hebrew alternatives and the schema wrapper
-// Clef gets one choice and two independent checks per alternative in one call.
+// Clef gets one choice and three independent checks per alternative in one call.
 // The shared request must
 // reserve that instruction/JSON overhead in addition to the article context.
-export const VERIFY_QUESTION_CHARS_PER_CANDIDATE = 10_000;
+export const VERIFY_QUESTION_CHARS_PER_CANDIDATE = 14_000;
 export const VERIFY_QUESTION_TOKENS_PER_CANDIDATE = Math.ceil(VERIFY_QUESTION_CHARS_PER_CANDIDATE / ESTIMATED_CHARS_PER_TOKEN);
 // One shared rewrite+verify request reserves a full short rewrite result plus the choice
 // question and alternatives per article.

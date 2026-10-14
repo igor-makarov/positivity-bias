@@ -1,3 +1,4 @@
+import { meaningfulRewrite } from './headline-change.ts';
 import type { Article, Fetch } from './types.ts';
 import { coverageOrder } from './news.ts';
 import { needsRewrite, sourceFingerprint } from './policy.ts';
@@ -17,6 +18,8 @@ export function pendingArticles<T extends Article>(articles: T[], fingerprint: s
       && now - Date.parse(article.rewriteAttemptAt || "") < DAY)))
     .sort((a, b) => Number(Date.parse(b.firstSeenAt || '') >= attemptedBefore)
       - Number(Date.parse(a.firstSeenAt || '') >= attemptedBefore)
+      || Number(Date.parse(b.firstSeenAt || '') >= now - DAY)
+      - Number(Date.parse(a.firstSeenAt || '') >= now - DAY)
       || (currentAttempt(a, fingerprint) ? Date.parse(a.rewriteAttemptAt || "") || 0 : 0)
       - (currentAttempt(b, fingerprint) ? Date.parse(b.rewriteAttemptAt || "") || 0 : 0))
     .slice(0, limit);
@@ -60,7 +63,7 @@ export async function mapConcurrently<T, R>(items: T[], mapper: (item: T, index:
 export function rewriteCoverage(articles: Article[], fingerprint: string) {
   const total = articles.length;
   const rewritten = articles.filter((article) => article.rewriteStatus === 'rewritten'
-    && article.rewriteFingerprint === fingerprint && article.headline !== article.originalHeadline).length;
+    && article.rewriteFingerprint === fingerprint && meaningfulRewrite(article.originalHeadline, article.headline)).length;
   const sourceUnavailable = articles.filter((article) => currentAttempt(article, fingerprint) && article.contextState === 'missing').length;
   const rejected = articles.filter((article) => article.rewriteStatus === 'rejected' && !needsRewrite(article, fingerprint)).length;
   return { total, rewritten, original: total - rewritten,
@@ -70,9 +73,15 @@ export function rewriteCoverage(articles: Article[], fingerprint: string) {
 
 // Prospective conversion coverage, never a claim of factual accuracy. Missing text,
 // rejections and deferred titles stay in the denominator. Unchanged copies do not count.
+export function newArticles<T extends Article>(articles: T[], since: string, now = Date.now()): T[] {
+  const start = Date.parse(since);
+  const windowStart = Math.max(Number.isFinite(start) ? start : now, now - DAY);
+  return articles.filter((article) => Date.parse(article.firstSeenAt || '') >= windowStart);
+}
 export function newTitleCoverage(articles: Article[], fingerprint: string, since: string, now = Date.now()) {
-  const windowStart = Math.max(Date.parse(since), now - DAY);
-  const retained = articles.filter((article) => Date.parse(article.firstSeenAt || '') >= windowStart);
+  const start = Date.parse(since);
+  const windowStart = Math.max(Number.isFinite(start) ? start : now, now - DAY);
+  const retained = newArticles(articles, since, now);
   const coverage = rewriteCoverage(retained, fingerprint);
   return { ...coverage, targetPercent: 90, targetMet: coverage.total > 0 && coverage.convertedPercent >= 90,
     since: new Date(windowStart).toISOString(), population: 'retained_new_or_corrected_titles_last_24h' };

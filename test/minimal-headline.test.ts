@@ -12,7 +12,7 @@ test('A minimal candidate removes standalone click prompts and retains every fac
   assert.equal(minimalHeadline('המשטרה מסרה כי התיעוד אינו עדכני'), null);
   assert.equal(minimalHeadline('תושבים צפו בניסוי שנערך בעיר'), null);
   assert.equal(minimalHeadline('ראש העיר: "לא נפסיק את העבודות" | תגובת התושבים'),
-    'ראש העיר: "לא נפסיק את העבודות"; תגובת התושבים');
+    null);
 });
 
 test('Minimal candidates use the same full-context validation and never bypass factual rejection', async () => {
@@ -28,7 +28,7 @@ test('Minimal candidates use the same full-context validation and never bypass f
     calls++;
     assert.equal(input.state![0].article, item.context);
     return {answers: {'0_headline': {type: 'choice', choice: 'original', confidence: 1,
-      probabilities: {option_1: 0, original: 1}}, '0_option_1_supported': {noul: 1}, '0_option_1_preserved': {noul: 0}}};
+      probabilities: {option_1: 0, original: 1}}, '0_option_1_supported': {noul: 1}, '0_option_1_preserved': {noul: 0}, '0_option_1_readable': {noul: 1}}};
   }}});
   assert.equal(calls, 1);
   assert.equal(result.accepted.size, 0);

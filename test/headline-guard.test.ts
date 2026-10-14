@@ -50,3 +50,12 @@ test('Serve-time checks retire malformed current-policy titles without retiring 
   assert.equal(result.articles[0].rewriteStatus, 'original');
   assert.equal(result.articles[1], articles[1]);
 });
+
+test('Professional role qualifiers and an explicit electoral purpose must survive', () => {
+  const original = 'הקבלנים: בגלל מחסור בממוני בטיחות אתרי בנייה יושבתו';
+  assert.equal(materialHeadlineSafe(original, 'הקבלנים מזהירים על עיכובים במסירת דירות בגלל מחסור בממונים'), false);
+  assert.equal(materialHeadlineSafe(original, 'הקבלנים מזהירים מהשבתת אתרים בשל מחסור בממוני בטיחות'), true);
+  const purpose = 'איראן משנה טקטיקה כדי להשפיע על הבחירות';
+  assert.equal(materialHeadlineSafe(purpose, 'איראן משנה טקטיקה ומגבירה תקיפות'), false);
+  assert.equal(materialHeadlineSafe(purpose, 'איראן מאמצת טקטיקה חדשה בניסיון להשפיע על הבחירות'), true);
+});

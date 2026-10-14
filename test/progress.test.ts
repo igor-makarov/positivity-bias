@@ -105,3 +105,10 @@ test('Prospective coverage excludes the baseline and keeps failed new titles in 
   assert.equal(coverage.targetMet, false);
   assert.equal(newTitleCoverage([], policy, since, now).targetMet, false);
 });
+
+test('Recent-cohort retries precede older baseline articles across editions', () => {
+  const recent = attempted({...article('recent'), firstSeenAt:new Date(now - 2*3600_000).toISOString()}, 'available');
+  const old = article('baseline');
+  assert.equal(pendingArticles([old,recent],policy,now,1,now)[0].id,'recent');
+  assert.equal(pendingArticles([old,{...recent,firstSeenAt:new Date(now - 25*3600_000).toISOString()}],policy,now,1,now)[0].id,'baseline');
+});

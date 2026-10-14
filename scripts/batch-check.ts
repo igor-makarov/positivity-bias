@@ -133,9 +133,11 @@ try {
   }
   const isolated = (await (await isolatedStore.fetch('https://news.internal/snapshot')).json() as FixtureResponse);
   assert.equal(isolated.rewriteContinuation, undefined);
-  assert.equal(isolated.rewriteCoverage!.rewritten, 22);
+  const failedItems = (await (await isolatedStore.fetch('https://news.internal/continue', {method:'POST'})).json() as FixtureResponse).calls.failedItems;
+  assert.ok(failedItems > 0 && failedItems < 24);
+  assert.equal(isolated.rewriteCoverage!.rewritten, 24 - failedItems);
   assert.equal(isolated.rewriteCoverage!.sourceUnavailable, 4);
-  assert.equal(isolated.rewriteCoverage!.pending, 2);
+  assert.equal(isolated.rewriteCoverage!.pending, failedItems);
   assert.equal(isolated.rewriteDiagnostics!.contextCandidates, 28);
   assert.equal(isolated.rewriteStatus, 'partial');
   assert.equal(isolated.rewriteDiagnostics!.failureStage, 'rewrite');

@@ -28,7 +28,7 @@ export interface AIInput {
   model?: string; state?: ClefRecord[]; questions?: Record<string, ClefQuestion>;
 }
 export interface ClefRecord { id: string; source?: string; publishedAt?: string;
-  originalHeadline: string; alternatives: { id: string; headline: string }[];
+  originalHeadline: string; publisherSummary?: string; alternatives: { id: string; headline: string }[];
   contextCompleteness?: string; article?: string }
 export interface ClefQuestion { type: string; instructions: string; criteria: Record<string,string> }
 export interface AI { run(model: string, input: AIInput): Promise<unknown> }
@@ -43,6 +43,7 @@ export interface Diagnostics {
   uncertainChoices: number; verified: number; accepted: number; returnedItems: number;
   contentChars: number; reasoningChars: number;
   failureStage: string | null; finishReason: string | null; outputShape: string | null; responseChannel: string | null;
+  readabilityFailures?: number; originalConflicts?: number; missingVerdicts?: number;
   providerFailureReason?: string; choiceAnswerShape?: unknown;
 }
 export interface Snapshot {
@@ -50,7 +51,7 @@ export interface Snapshot {
   policyFingerprint: string | null; lastRefreshPolicy?: string; rewriteStatus: string;
   rewritesRetiredAt?: string; rewriteDiagnostics?: Diagnostics | null;
   rewriteContinuation?: { policy: string; day: string; roundsLeft: number };
-  newTitlesSince?: string; newTitleCoverage?: unknown; refreshing?: boolean; rewriteCoverage?: Coverage; dailyNeurons?: { used: number; budget: number };
+  newTitlesSince?: string; newTitleCoverage?: NewTitleCoverage; refreshing?: boolean; rewriteCoverage?: Coverage; dailyNeurons?: { used: number; budget: number };
 }
 export interface RefreshResult { state: string; articles?: number; rewriteStatus?: string;
   sources?: { id: string; state: string }[] }
@@ -60,3 +61,11 @@ export interface ContextOptions { maxChars?: number; minChars?: number }
 export interface Metadata { headline: string; description: string; body: string; categories: string[]; publishedAt?: string }
 
 export interface Coverage { total: number; rewritten: number; original: number; convertedPercent: number; sourceUnavailable: number; rejected: number; pending: number }
+
+export interface NewTitleCoverage extends Coverage { targetPercent: number; targetMet: boolean; since: string; population: string }
+
+export interface PublicStatus {
+  updatedAt: string | null; lastAttemptAt: string | null; rewriteStatus: string;
+  sources: SourceStatus[]; refreshing: boolean; stale: boolean;
+  rewriteCoverage?: Coverage; newTitleCoverage?: NewTitleCoverage;
+}
